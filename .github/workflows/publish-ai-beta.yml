@@ -1,0 +1,39 @@
+name: Publish AI Idle Beta
+
+on:
+  workflow_run:
+    workflows: ["Optimized Android APKs under 50 MB"]
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha == '1c54682255770dcd423d275e86adad2209933a46' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download tested optimized signed APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          mkdir -p apks
+          gh run download "$RUN_ID" --repo "${{ github.repository }}" --name takz-optimized-signed-per-abi --dir apks
+          test "$(find apks -name '*.apk' -type f | wc -l)" -eq 4
+          for apk in apks/*.apk; do
+            test -s "$apk"
+            test "$(stat -c%s "$apk")" -lt 50000000
+          done
+      - name: Publish v0.2.0-beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.2.0-beta apks/*.apk \
+            --repo "${{ github.repository }}" \
+            --target 1c54682255770dcd423d275e86adad2209933a46 \
+            --title "TakZ Gallery v0.2.0 Beta — Idle AI Tagging" \
+            --prerelease \
+            --notes "New offline image classification uses the bundled ML Kit model (400+ vision classes) rather than hand-written subject heuristics. Tag indexing runs on WorkManager while idle with battery-aware short batches, OCR-derived per-image text tokens, batched MediaStore scanning, background search ranking and persistent cursor. The model's vocabulary is finite; this is not free-form generative captioning. Four CPU-specific APKs retain ABI support. Automated tests, signed-APK verification and the <50MB per-APK limit must have passed for publishing. APKs are signed with the CI DEBUG key (not a persistent production signing key); back up data before uninstall/reinstalling. No real-device performance or visual accuracy benchmark has yet been completed."
