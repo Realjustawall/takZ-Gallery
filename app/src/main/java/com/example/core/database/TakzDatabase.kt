@@ -19,6 +19,9 @@ interface TakzDao {
     @Query("SELECT * FROM media_items ORDER BY dateModifiedSec DESC")
     suspend fun getAllMediaOnce(): List<MediaItemEntity>
 
+    @Query("SELECT contentUri FROM media_items")
+    suspend fun getAllMediaUrisOnce(): List<String>
+
     @Query("SELECT * FROM media_items WHERE id = :id LIMIT 1")
     suspend fun getMediaById(id: Long): MediaItemEntity?
 
