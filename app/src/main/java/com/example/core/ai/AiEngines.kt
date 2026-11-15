@@ -1080,30 +1080,38 @@ class SearchRankingEngine(
             .thenByDescending { it.media.dateModifiedSec })
     }
 
-    /** Fast search-by-example using indexed 64-bit perceptual image hashes.
-     * Near duplicates, crops with small edits, and similar layouts are candidates.
-     * This is visual near-similarity, not open-vocabulary image understanding.
+    /** Searches indexed photos by both perceptual shape and ML Kit classifier labels.
+     * This uses actual image-specific labels, not filename guesses, and keeps data on-device.
      */
     fun searchByExample(
         allMedia: List<MediaItemEntity>,
         referenceHash: Long,
         referenceColor: String,
+        referenceLabels: Set<String> = emptySet(),
         maxResults: Int = 120
     ): List<RankedSearchResult> {
+        val labels = referenceLabels.map { PersianNormalizer.normalizeForSearch(it) }
+            .filter { it.isNotBlank() }.toSet()
         val ranked = ArrayList<RankedSearchResult>()
         for (item in allMedia) {
             if (item.isTrashed || item.isHidden || item.isVideo || !item.isIndexed) continue
             val hash = item.perceptualHash64
-            // A zero hash is valid only in theory; older unindexed rows use zero as a sentinel.
-            if (hash == 0L) continue
-            val distance = java.lang.Long.bitCount(referenceHash xor hash)
+            val distance = if (hash != 0L) java.lang.Long.bitCount(referenceHash xor hash) else 64
             val colorMatch = item.dominantColorBucket.equals(referenceColor, ignoreCase = true)
-            if (distance > 23 && !(colorMatch && distance <= 30)) continue
-            val similarity = (1f - distance.toFloat() / 64f).coerceIn(0f, 1f)
-            val score = similarity + if (colorMatch) 0.06f else 0f
+            val itemLabels = item.parseAiTags()
+                .filter { it.category.equals("Vision", true) }
+                .associate { PersianNormalizer.normalizeForSearch(it.labelEn) to it.confidence.coerceIn(0f, 1f) }
+            val matched = labels.sumOf { name -> (itemLabels[name] ?: 0f).toDouble() }
+            val labelScore = if (labels.isNotEmpty()) (matched / labels.size).toFloat() else 0f
+            val visuallyClose = distance <= 23 || (colorMatch && distance <= 30)
+            if (!visuallyClose && labelScore < 0.35f) continue
+            val shapeScore = if (hash != 0L) (1f - distance.toFloat() / 64f) else 0f
+            val score = if (labels.isEmpty()) shapeScore + if (colorMatch) 0.06f else 0f
+                else labelScore * 0.75f + shapeScore * 0.32f + if (colorMatch) 0.04f else 0f
+            val detail = if (labelScore >= 0.35f) "Object match" else "Visual match"
             ranked.add(RankedSearchResult(
-                item, score, similarity, MatchReason.SEMANTIC_AI,
-                "Visual match · ${(similarity * 100).toInt()}%"
+                item, score, labelScore.coerceIn(0f, 1f),
+                MatchReason.SEMANTIC_AI, detail
             ))
         }
         return ranked.sortedByDescending { it.finalScore }.take(maxResults)
