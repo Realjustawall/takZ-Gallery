@@ -206,6 +206,7 @@ class MediaLibraryManager(
     suspend fun scanDeviceMediaStore() = withContext(Dispatchers.IO) {
         runCatching {
             val existingUris = dao.getAllMediaOnce().map { it.contentUri }.toHashSet()
+            val batch = ArrayList<MediaItemEntity>(64)
             val imgProjection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME,
@@ -244,7 +245,7 @@ class MediaLibraryManager(
                         val h = cursor.getInt(hCol).coerceAtLeast(0)
                         val size = cursor.getLong(sizeCol)
                         val dateSec = cursor.getLong(dateCol)
-                        dao.insertMedia(
+                        batch.add(
                             MediaItemEntity(
                                 contentUri = uri,
                                 fileName = name,
@@ -259,9 +260,15 @@ class MediaLibraryManager(
                             )
                         )
                     }
+                    if (batch.size >= 64) {
+                        dao.insertMediaIgnore(batch.toList())
+                        batch.clear()
+                    }
                     count++
                 }
             }
+
+            if (batch.isNotEmpty()) { dao.insertMediaIgnore(batch.toList()); batch.clear() }
 
             // Scan Device Videos as well
             val vidProjection = arrayOf(
@@ -305,7 +312,7 @@ class MediaLibraryManager(
                         val size = cursor.getLong(sizeCol)
                         val durMs = cursor.getLong(durCol).coerceAtLeast(0L)
                         val dateSec = cursor.getLong(dateCol)
-                        dao.insertMedia(
+                        batch.add(
                             MediaItemEntity(
                                 contentUri = uri,
                                 fileName = name,
@@ -322,9 +329,14 @@ class MediaLibraryManager(
                             )
                         )
                     }
+                    if (batch.size >= 64) {
+                        dao.insertMediaIgnore(batch.toList())
+                        batch.clear()
+                    }
                     count++
                 }
             }
+            if (batch.isNotEmpty()) dao.insertMediaIgnore(batch.toList())
         }
     }
 
