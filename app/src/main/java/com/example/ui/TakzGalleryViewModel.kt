@@ -66,6 +66,7 @@ data class UserSettingsState(
         }
 }
 
+@OptIn(kotlinx.coroutines.FlowPreview::class)
 class TakzGalleryViewModel(application: Application) : AndroidViewModel(application) {
     private val context = application.applicationContext
     private val prefs = context.getSharedPreferences("takz_oneui_settings_v3", Application.MODE_PRIVATE)
@@ -160,7 +161,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     val searchFilters: StateFlow<SearchRankingEngine.SearchFilters> = _searchFilters.asStateFlow()
 
     val rankedSearchResults: StateFlow<List<SearchRankingEngine.RankedSearchResult>> =
-        combine(allMedia, _searchQuery, _searchFilters) { media, query, filters ->
+        combine(allMedia, _searchQuery.debounce(240).distinctUntilChanged(), _searchFilters) { media, query, filters ->
             searchRankingEngine.searchAndRank(media, query, filters)
         }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
