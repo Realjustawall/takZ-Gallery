@@ -79,7 +79,7 @@ fun TakzGalleryAppRoot(viewModel: TakzGalleryViewModel) {
     val activity = LocalContext.current as? Activity
     val mediaPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { viewModel.triggerReindexAll() }
+    ) { viewModel.refreshGalleryAfterPermission() }
     LaunchedEffect(Unit) {
         val requiredPermissions = if (Build.VERSION.SDK_INT >= 33) {
             listOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
