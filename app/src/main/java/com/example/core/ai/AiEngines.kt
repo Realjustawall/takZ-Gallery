@@ -944,7 +944,7 @@ class SearchRankingEngine(
     )
 
     private fun parseQuery(input: String): ParsedQuery {
-        val tokens = Regex("\\"[^\\"]+\\"|\\S+").findAll(input).map { it.value }.toList()
+        val tokens = Regex("""("[^"]+"|\S+)""").findAll(input).map { it.value }.toList()
         val text = ArrayList<String>()
         val phrases = ArrayList<String>()
         var type: String? = null
