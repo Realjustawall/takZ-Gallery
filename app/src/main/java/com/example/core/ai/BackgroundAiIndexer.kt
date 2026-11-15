@@ -55,7 +55,7 @@ object RealImageTagger {
                         )
                     }.take(12).toList()
                 // OCR words are specific to each photo and are not a predefined tag catalogue.
-                val textTags = Regex("[\\p{L}\\p{N}]{3,24}")
+                val textTags = Regex("""[\\p{L}\\p{N}]{3,24}""")
                     .findAll(recognizedText)
                     .map { it.value.trim().lowercase() }
                     .filter { it.length in 3..24 }
