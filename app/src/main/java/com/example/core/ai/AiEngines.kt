@@ -979,8 +979,11 @@ class SearchRankingEngine(
             val tagBoost = if (tagMatches > 0) 0.38f * (tagMatches.toFloat() / queryTokens.size.coerceAtLeast(1)) else 0f
             val fileBoost = if (fileMatches > 0) 0.25f * (fileMatches.toFloat() / queryTokens.size.coerceAtLeast(1)) else 0f
 
-            val combinedScore = semanticSim * 0.78f + ocrBoost + tagBoost + fileBoost
-            if (semanticSim >= filters.minSemanticScore || ocrMatches > 0 || tagMatches > 0 || fileMatches > 0) {
+            // Prefer labels confirmed by the on-device classifier and OCR; do not let
+            // a weak vocabulary-projection cosine score overwhelm real text matches.
+            val combinedScore = semanticSim * 0.20f + ocrBoost + tagBoost * 1.6f + fileBoost
+            if ((item.isIndexed && semanticSim >= maxOf(filters.minSemanticScore, 0.56f)) ||
+                ocrMatches > 0 || tagMatches > 0 || fileMatches > 0) {
                 val reason = when {
                     ocrMatches > 0 && ocrBoost >= semanticSim * 0.5f -> MatchReason.OCR_TEXT
                     tagMatches > 0 && semanticSim < 0.45f -> MatchReason.EXACT_TAG
