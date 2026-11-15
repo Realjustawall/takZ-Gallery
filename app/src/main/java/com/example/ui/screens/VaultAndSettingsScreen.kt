@@ -687,6 +687,7 @@ fun SettingsScreen(
                 "NEON_THEME" to strings.tr("Theme & Color", "پوسته و رنگ"),
                 "LANGUAGE" to strings.tr("Language & Date", "زبان و تقویم"),
                 "LAYOUT" to strings.tr("Grid Layout", "چیدمان گالری"),
+                "AI" to strings.tr("Background AI", "هوش مصنوعی پس‌زمینه"),
                 "BACKUP" to strings.tr("Backup", "پشتیبان‌گیری")
             )
             Row(
@@ -922,6 +923,62 @@ fun SettingsScreen(
                                     checked = settings.memoriesEnabled,
                                     onCheckedChange = { m -> viewModel.updateSettings { it.copy(memoriesEnabled = m) } }
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (selectedSection == "AI") {
+                item {
+                    val enabled by viewModel.autoAiEnabled.collectAsStateWithLifecycle()
+                    Card(
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        strings.tr("Automatic AI tagging", "تگ‌گذاری خودکار هوش مصنوعی"),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        strings.tr(
+                                            "Runs only while the device is idle, with safe battery and storage; processes a small batch each time.",
+                                            "فقط در زمان بیکار بودن گوشی و مناسب بودن باتری و حافظه، عکس‌ها را دسته‌دسته بررسی می‌کند."
+                                        ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Switch(
+                                    checked = enabled,
+                                    onCheckedChange = viewModel::setAutomaticAiEnabled,
+                                    modifier = Modifier.testTag("background_ai_toggle")
+                                )
+                            }
+                            Text(
+                                strings.tr(
+                                    "Images indexed in background: ${viewModel.getBackgroundAiProcessedTotal()}",
+                                    "تعداد تصاویر پردازش‌شده در پس‌زمینه: ${viewModel.getBackgroundAiProcessedTotal()}"
+                                ),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            OutlinedButton(
+                                onClick = viewModel::triggerReindexAll,
+                                enabled = enabled
+                            ) {
+                                Text(strings.tr("Rebuild AI tags when idle", "ساخت دوباره تگ‌ها هنگام بیکاری گوشی"))
                             }
                         }
                     }
