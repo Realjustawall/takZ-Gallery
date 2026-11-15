@@ -206,7 +206,7 @@ class MediaLibraryManager(
     suspend fun scanDeviceMediaStore() = withContext(Dispatchers.IO) {
         runCatching {
             val existingUris = dao.getAllMediaOnce().map { it.contentUri }.toHashSet()
-            val batch = ArrayList<MediaItemEntity>(64)
+            val batch = ArrayList<MediaItemEntity>(256)
             val imgProjection = arrayOf(
                 MediaStore.Images.Media._ID,
                 MediaStore.Images.Media.DISPLAY_NAME,
@@ -260,7 +260,7 @@ class MediaLibraryManager(
                             )
                         )
                     }
-                    if (batch.size >= 64) {
+                    if (batch.size >= 256) {
                         dao.insertMediaIgnore(batch.toList())
                         batch.clear()
                     }
@@ -329,7 +329,7 @@ class MediaLibraryManager(
                             )
                         )
                     }
-                    if (batch.size >= 64) {
+                    if (batch.size >= 256) {
                         dao.insertMediaIgnore(batch.toList())
                         batch.clear()
                     }
