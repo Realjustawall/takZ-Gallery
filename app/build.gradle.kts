@@ -25,7 +25,12 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
+      // Beta test builds can opt into a debug signing key; production release remains unsigned unless configured.
+      if (providers.gradleProperty("takzBetaSigning").orNull == "true") {
+        signingConfig = signingConfigs.getByName("debug")
+      }
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
@@ -35,6 +40,16 @@ android {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
       // Android Gradle Plugin creates its own standard debug keystore.
+    }
+  }
+  // Split native libraries by CPU architecture for beta uploads. No ABI is removed:
+  // distribute the four APKs together so all previously supported devices remain supported.
+  splits {
+    abi {
+      isEnable = providers.gradleProperty("takzAbiSplits").orNull == "true"
+      reset()
+      include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+      isUniversalApk = false
     }
   }
   compileOptions {
