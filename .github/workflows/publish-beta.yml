@@ -1,0 +1,35 @@
+name: Publish TakZ Gallery Beta Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-beta.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish-beta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download previously verified signed debug APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release-apk
+          gh run download 43738269728 --repo "${{ github.repository }}" --name TakZ-Gallery-signed-debug --dir release-apk
+          find release-apk -type f -maxdepth 2 -print
+          test -s release-apk/app-debug.apk
+      - name: Publish beta release with signed debug APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.1.0-beta release-apk/app-debug.apk \
+            --repo "${{ github.repository }}" \
+            --target d4ece6e465010d36f7bc6c461be66d4f7193b03b \
+            --title "TakZ Gallery v0.1.0 Beta" \
+            --prerelease \
+            --notes "First testable Android beta. Built successfully in GitHub Actions run 43738269728; automated unit tests and Android debug APK signature verification passed. This APK is signed using the Android debug key, NOT a stable production release key. Real-device testing is still required; gallery operations, video editing and AI features may have outstanding limitations. Do not use this beta as the sole storage for important photos or vault items."
