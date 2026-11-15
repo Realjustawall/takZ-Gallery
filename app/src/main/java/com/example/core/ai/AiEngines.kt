@@ -1106,8 +1106,11 @@ class SearchRankingEngine(
             val visuallyClose = distance <= 23 || (colorMatch && distance <= 30)
             if (!visuallyClose && labelScore < 0.35f) continue
             val shapeScore = if (hash != 0L) (1f - distance.toFloat() / 64f) else 0f
-            val score = if (labels.isEmpty()) shapeScore + if (colorMatch) 0.06f else 0f
-                else labelScore * 0.75f + shapeScore * 0.32f + if (colorMatch) 0.04f else 0f
+            val score = if (labels.isEmpty()) {
+                shapeScore + (if (colorMatch) 0.06f else 0f)
+            } else {
+                labelScore * 0.75f + shapeScore * 0.32f + (if (colorMatch) 0.04f else 0f)
+            }
             val detail = if (labelScore >= 0.35f) "Object match" else "Visual match"
             ranked.add(RankedSearchResult(
                 item, score, labelScore.coerceIn(0f, 1f),
