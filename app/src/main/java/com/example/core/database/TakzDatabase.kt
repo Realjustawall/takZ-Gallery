@@ -40,6 +40,9 @@ interface TakzDao {
     @Query("SELECT * FROM media_items WHERE isIndexed = 0 AND isVideo = 0 AND isTrashed = 0 ORDER BY dateModifiedSec DESC LIMIT :limit")
     suspend fun getPendingImageIndex(limit: Int): List<MediaItemEntity>
 
+    @Query("SELECT * FROM media_items WHERE isIndexed = 0 AND isVideo = 0 AND isTrashed = 0 AND id > :lastSeenId ORDER BY id ASC LIMIT :limit")
+    suspend fun getPendingImageIndexAfter(lastSeenId: Long, limit: Int): List<MediaItemEntity>
+
     @Query("UPDATE media_items SET isIndexed = 0 WHERE isVideo = 0")
     suspend fun resetImageIndex()
 
