@@ -116,6 +116,20 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
 
     val indexingStatus = libraryManager.indexingStatus
 
+    private val _autoAiEnabled = MutableStateFlow(BackgroundAiScheduler.isEnabled(context))
+    val autoAiEnabled: StateFlow<Boolean> = _autoAiEnabled.asStateFlow()
+
+    fun setAutomaticAiEnabled(enabled: Boolean) {
+        BackgroundAiScheduler.setEnabled(context, enabled)
+        _autoAiEnabled.value = enabled
+        showStatusMessage(if (enabled) "AI tagging queued for idle time" else "Background AI paused")
+    }
+
+    fun getBackgroundAiProcessedTotal(): Long =
+        context.getSharedPreferences("takz_background_ai_v2", Application.MODE_PRIVATE)
+            .getLong("processed_total", 0L)
+
+
     // Navigation & active screens
     private val _activeBottomTab = MutableStateFlow("PHOTOS")
     val activeBottomTab: StateFlow<String> = _activeBottomTab.asStateFlow()
