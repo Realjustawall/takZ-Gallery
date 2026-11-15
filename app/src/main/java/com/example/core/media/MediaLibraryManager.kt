@@ -371,9 +371,9 @@ class MediaLibraryManager(
                 exifSummary = "Imported from Android Photo Picker"
             )
             val newId = dao.insertMedia(initial)
-            val analyzed = runAiAnalysisForItem(initial.copy(id = newId))
-            dao.updateMedia(analyzed)
-            analyzed
+            // Imported media is queued for idle indexing; never block the picker UI on ML.
+            com.example.core.ai.BackgroundAiScheduler.schedule(context)
+            initial.copy(id = newId)
         }.getOrNull()
     }
 
@@ -382,7 +382,7 @@ class MediaLibraryManager(
      */
     suspend fun runAiAnalysisForItem(item: MediaItemEntity): MediaItemEntity = withContext(Dispatchers.IO) {
         val bitmap = loadSampledBitmap(item.contentUri, maxDimension = 256)
-            ?: createFallbackBitmap(item.dominantColorHex)
+            ?: throw java.io.IOException("Cannot decode media for AI indexing: ${item.contentUri}")
 
         val digest = MessageDigest.getInstance("SHA-256")
         openMediaInput(item.contentUri).use { source ->
@@ -404,7 +404,8 @@ class MediaLibraryManager(
             fileNameHint = item.fileName,
             ocrTextHint = ocrResult.fullText
         )
-        val aiTags = imageTaggingEngine.generateStructuredTags(embedding)
+        // Real model inference, not hard-coded prototype labels.
+        val aiTags = com.example.core.ai.RealImageTagger.classify(bitmap, ocrResult.fullText)
 
         val embCsv = embedding.joinToString(",") { "%.4f".format(java.util.Locale.US, it) }
         val tagsPipe = aiTags.joinToString("|") {
