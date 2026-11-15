@@ -22,6 +22,7 @@ import com.example.core.database.VirtualAlbumEntity
 import com.example.core.localization.AppLanguage
 import com.example.core.localization.CalendarSystem
 import com.example.core.media.MediaLibraryManager
+import com.example.core.ai.BackgroundAiScheduler
 import com.example.core.media.PhotoEditPipelineState
 import com.example.core.media.PhotoProcessingEngine
 import com.example.core.security.VaultCryptoEngine
@@ -34,7 +35,10 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -158,7 +162,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     val rankedSearchResults: StateFlow<List<SearchRankingEngine.RankedSearchResult>> =
         combine(allMedia, _searchQuery, _searchFilters) { media, query, filters ->
             searchRankingEngine.searchAndRank(media, query, filters)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Vault state
     private val _isVaultUnlocked = MutableStateFlow(false)
@@ -168,9 +172,8 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     val isPinConfigured: StateFlow<Boolean> = _isPinConfigured.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            libraryManager.synchronizeAndIndexLibrary(forceReindexAll = false)
-        }
+        // Never scan, hash, decode, or classify the gallery while the UI is opening.
+        BackgroundAiScheduler.schedule(context)
     }
 
     fun showStatusMessage(msg: String?) {
@@ -430,8 +433,9 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
 
     fun triggerReindexAll() {
         viewModelScope.launch {
-            libraryManager.synchronizeAndIndexLibrary(forceReindexAll = true)
-            showStatusMessage("Completed full on-device AI re-indexing")
+            withContext(Dispatchers.IO) { dao.resetImageIndex() }
+            BackgroundAiScheduler.schedule(context)
+            showStatusMessage("Queued AI re-indexing for idle charging time")
         }
     }
 
