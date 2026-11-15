@@ -2,6 +2,9 @@ package com.example.core.ai
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.Manifest
+import android.os.Build
+import android.content.pm.PackageManager
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -120,19 +123,30 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
                 qualityEngine = ImageQualityEngine(),
                 vaultCryptoEngine = VaultCryptoEngine(context)
             )
-            if (!prefs.getBoolean("initial_scan_done", false)) {
-                manager.scanDeviceMediaStore()
-                prefs.edit().putBoolean("initial_scan_done", true).apply()
+            val mediaPermission = if (Build.VERSION.SDK_INT >= 33) {
+                context.checkSelfPermission(Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
+                (Build.VERSION.SDK_INT >= 34 && context.checkSelfPermission(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED)
+            } else {
+                context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
             }
-            // Max eight decoded images per pass; allow the OS to suspend promptly.
-            val pending = dao.getPendingImageIndex(8)
+            // Keep newly captured photos discoverable; never mark a denied scan complete.
+            val now = System.currentTimeMillis()
+            if (mediaPermission && now - prefs.getLong("last_scan_ms", 0L) > 6L * 60L * 60L * 1000L) {
+                manager.scanDeviceMediaStore()
+                prefs.edit().putLong("last_scan_ms", now).apply()
+            }
+            // Bound CPU usage for each idle pass.
+            val started = System.currentTimeMillis()
+            val pending = dao.getPendingImageIndex(40)
             if (pending.isEmpty()) return@withContext Result.success()
             val updated = mutableListOf<com.example.core.database.MediaItemEntity>()
             for (item in pending) {
                 coroutineContext.ensureActive()
-                if (isStopped) break
+                if (isStopped || System.currentTimeMillis() - started > 90_000L) break
                 try {
                     updated += manager.runAiAnalysisForItem(item)
+                } catch (cancel: kotlinx.coroutines.CancellationException) {
+                    throw cancel
                 } catch (_: Exception) {
                     // Leave the item unindexed for a later attempt, not falsely completed.
                     continue
