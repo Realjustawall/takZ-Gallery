@@ -1,0 +1,39 @@
+name: Publish optimized beta APKs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-optimized.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all four tested signed APKs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p apks
+          gh run download 43739342830 --repo "${{ github.repository }}" --name takz-optimized-signed-per-abi --dir apks
+          test "$(find apks -name '*.apk' | wc -l)" -eq 4
+          for apk in apks/*.apk; do
+            size=$(stat -c%s "$apk")
+            echo "$apk $size bytes"
+            test "$size" -lt 50000000
+          done
+      - name: Create optimized beta release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.1.1-beta apks/*.apk \
+            --repo "${{ github.repository }}" \
+            --target ef00d9b93428c972178da8485f7407c07e5c982a \
+            --title "TakZ Gallery v0.1.1 Beta — Optimized (<50MB per device)" \
+            --prerelease \
+            --notes "Optimized test build: R8 code shrinking, Android resource shrinking and one APK per supported ABI. Download only the APK for your device (arm64-v8a for most recent Android phones, armeabi-v7a for older 32-bit phones). All four APKs are under 50 MB, and automated tests, signature verification and APK build passed (Actions run 43739342830). No app features were intentionally disabled. Each artifact is signed with CI-generated Android DEBUG key, not a production release key. It may not update the previous beta without uninstalling the old app; back up data before changing installations. Important: the versionName embedded in this first optimized APK is unchanged from the source (1.0.0). Real-device functional tests are still required. Some pre-existing feature limitations remain."
