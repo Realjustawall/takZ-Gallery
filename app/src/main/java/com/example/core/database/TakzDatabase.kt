@@ -34,6 +34,15 @@ interface TakzDao {
     @Update
     suspend fun updateMedia(item: MediaItemEntity)
 
+    @Update
+    suspend fun updateMediaBatch(items: List<MediaItemEntity>)
+
+    @Query("SELECT * FROM media_items WHERE isIndexed = 0 AND isVideo = 0 AND isTrashed = 0 ORDER BY dateModifiedSec DESC LIMIT :limit")
+    suspend fun getPendingImageIndex(limit: Int): List<MediaItemEntity>
+
+    @Query("UPDATE media_items SET isIndexed = 0 WHERE isVideo = 0")
+    suspend fun resetImageIndex()
+
     @Query("UPDATE media_items SET isFavorite = :favorite WHERE id = :id")
     suspend fun setFavorite(id: Long, favorite: Boolean)
 
