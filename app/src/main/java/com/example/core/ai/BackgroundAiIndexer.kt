@@ -137,12 +137,16 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
             }
             // Bound CPU usage for each idle pass.
             val started = System.currentTimeMillis()
-            val pending = dao.getPendingImageIndex(40)
+            val cursor = prefs.getLong("index_cursor_id", 0L)
+            val pending = dao.getPendingImageIndexAfter(cursor, 40)
+                .ifEmpty { dao.getPendingImageIndexAfter(0L, 40) }
             if (pending.isEmpty()) return@withContext Result.success()
             val updated = mutableListOf<com.example.core.database.MediaItemEntity>()
+            var lastSeenId = cursor
             for (item in pending) {
                 coroutineContext.ensureActive()
                 if (isStopped || System.currentTimeMillis() - started > 90_000L) break
+                lastSeenId = item.id
                 try {
                     updated += manager.runAiAnalysisForItem(item)
                 } catch (cancel: kotlinx.coroutines.CancellationException) {
@@ -153,6 +157,8 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
                 }
             }
             if (updated.isNotEmpty()) dao.updateMediaBatch(updated)
+            // Advance after DB commit even when an individual unreadable image failed.
+            prefs.edit().putLong("index_cursor_id", lastSeenId).apply()
             Result.success()
         } catch (_: Exception) {
             Result.retry()
