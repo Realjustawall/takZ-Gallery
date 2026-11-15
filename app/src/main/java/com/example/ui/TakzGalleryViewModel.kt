@@ -172,8 +172,16 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     val isPinConfigured: StateFlow<Boolean> = _isPinConfigured.asStateFlow()
 
     init {
-        // Never scan, hash, decode, or classify the gallery while the UI is opening.
         BackgroundAiScheduler.schedule(context)
+        // Only MediaStore metadata is loaded here; photo decode, OCR and AI stay idle-only.
+        viewModelScope.launch(Dispatchers.IO) { libraryManager.scanDeviceMediaStore() }
+    }
+
+    fun refreshGalleryAfterPermission() {
+        viewModelScope.launch(Dispatchers.IO) {
+            libraryManager.scanDeviceMediaStore()
+            BackgroundAiScheduler.schedule(context)
+        }
     }
 
     fun showStatusMessage(msg: String?) {
@@ -426,14 +434,17 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch {
             val imported = libraryManager.importPickedUri(uri)
             if (imported != null) {
-                showStatusMessage("Imported & AI-indexed: ${imported.fileName}")
+                showStatusMessage("Imported; AI tagging queued: ${imported.fileName}")
             }
         }
     }
 
     fun triggerReindexAll() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { dao.resetImageIndex() }
+            withContext(Dispatchers.IO) {
+                dao.resetImageIndex()
+                libraryManager.scanDeviceMediaStore()
+            }
             BackgroundAiScheduler.schedule(context)
             showStatusMessage("Queued AI re-indexing for idle charging time")
         }
