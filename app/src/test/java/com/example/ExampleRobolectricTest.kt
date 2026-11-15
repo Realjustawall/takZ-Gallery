@@ -171,4 +171,58 @@ class ExampleRobolectricTest {
         assertTrue("GCM authentication must detect tampered ciphertext", rejected)
     }
 
+    @Test
+    fun `advanced search respects typed operators, real OCR and private media`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val search = SearchRankingEngine(TextEmbeddingEngine(context))
+        val data = listOf(
+            MediaItemEntity(
+                id = 200L, contentUri = "content://image/200",
+                fileName = "invoice.jpg", folderName = "Receipts", mimeType = "image/jpeg",
+                isIndexed = true, isFavorite = true,
+                ocrText = "Order 876543 - 2024", dateModifiedSec = 1709251200L,
+                dominantColorBucket = "white"
+            ),
+            MediaItemEntity(
+                id = 201L, contentUri = "content://video/201",
+                fileName = "invoice.mp4", folderName = "Movies", mimeType = "video/mp4",
+                isVideo = true, ocrText = "Order 876543",
+                dateModifiedSec = 1709251200L
+            ),
+            MediaItemEntity(
+                id = 202L, contentUri = "content://image/202",
+                fileName = "secret-invoice.jpg", folderName = "Private", mimeType = "image/jpeg",
+                isHidden = true, ocrText = "Order 876543"
+            )
+        )
+        assertEquals(
+            listOf(200L),
+            search.searchAndRank(data, "\"order 876543\" type:photo favorite:true after:2024-01-01")
+                .map { it.media.id }
+        )
+        assertEquals(
+            listOf(201L),
+            search.searchAndRank(data, "type:video has:text folder:Movies")
+                .map { it.media.id }
+        )
+        assertTrue(search.searchAndRank(data, "type:photo before:2020-01-01").isEmpty())
+    }
+
+    @Test
+    fun `visual photo search finds similar hashes while respecting hidden photos`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val search = SearchRankingEngine(TextEmbeddingEngine(context))
+        val data = listOf(
+            MediaItemEntity(id = 301L, contentUri = "file:///first.jpg", fileName = "first.jpg",
+                folderName = "Camera", mimeType = "image/jpeg", isIndexed = true,
+                perceptualHash64 = 0x7F00FF00L, dominantColorBucket = "blue"),
+            MediaItemEntity(id = 302L, contentUri = "file:///hidden.jpg", fileName = "hidden.jpg",
+                folderName = "Camera", mimeType = "image/jpeg", isIndexed = true,
+                perceptualHash64 = 0x7F00FF00L, dominantColorBucket = "blue", isHidden = true)
+        )
+        val ranked = search.searchByExample(data, 0x7F00FF00L, "blue")
+        assertEquals(listOf(301L), ranked.map { it.media.id })
+        assertTrue(ranked.first().finalScore > 0.95f)
+    }
+
 }
