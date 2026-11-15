@@ -82,7 +82,20 @@ object RealImageTagger {
 object BackgroundAiScheduler {
     private const val NAME = "takz-idle-ai-indexing-v2"
 
+    private const val PREFS = "takz_background_ai_v2"
+
+    fun isEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("ai_enabled", true)
+
+    fun setEnabled(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean("ai_enabled", enabled).apply()
+        if (enabled) schedule(context)
+        else WorkManager.getInstance(context.applicationContext).cancelUniqueWork(NAME)
+    }
+
     fun schedule(context: Context) {
+        if (!isEnabled(context)) return
         val constraints = Constraints.Builder()
             .setRequiresDeviceIdle(true)
             .setRequiresBatteryNotLow(true)
@@ -109,6 +122,7 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
         val dao = TakzDatabase.getInstance(context).takzDao()
         val prefs = context.getSharedPreferences("takz_background_ai_v2", Context.MODE_PRIVATE)
         try {
+            if (!BackgroundAiScheduler.isEnabled(context)) return@withContext Result.success()
             // Invalidate legacy heuristic labels only once, while device is idle and charging.
             if (!prefs.getBoolean("legacy_reset", false)) {
                 dao.resetImageIndex()
@@ -150,24 +164,27 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
             val pending = dao.getPendingImageIndexAfter(cursor, maxItems)
                 .ifEmpty { dao.getPendingImageIndexAfter(0L, maxItems) }
             if (pending.isEmpty()) return@withContext Result.success()
-            val updated = mutableListOf<com.example.core.database.MediaItemEntity>()
-            var lastSeenId = cursor
             for (item in pending) {
                 coroutineContext.ensureActive()
-                if (isStopped || System.currentTimeMillis() - started > budgetMs) break
-                lastSeenId = item.id
+                if (isStopped || !BackgroundAiScheduler.isEnabled(context) ||
+                    System.currentTimeMillis() - started > budgetMs) break
                 try {
-                    updated += manager.runAiAnalysisForItem(item)
+                    val indexed = manager.runAiAnalysisForItem(item)
+                    // Persist each photo so a killed job does not lose its progress.
+                    dao.updateMedia(indexed)
+                    prefs.edit()
+                        .putLong("index_cursor_id", item.id)
+                        .putLong("last_indexed_ms", System.currentTimeMillis())
+                        .putLong("processed_total", prefs.getLong("processed_total", 0L) + 1L)
+                        .apply()
                 } catch (cancel: kotlinx.coroutines.CancellationException) {
                     throw cancel
                 } catch (_: Exception) {
-                    // Leave the item unindexed for a later attempt, not falsely completed.
-                    continue
+                    // Retry unreadable items after the cursor wraps.
+                    prefs.edit().putLong("index_cursor_id", item.id).apply()
                 }
+                kotlinx.coroutines.yield()
             }
-            if (updated.isNotEmpty()) dao.updateMediaBatch(updated)
-            // Advance after DB commit even when an individual unreadable image failed.
-            prefs.edit().putLong("index_cursor_id", lastSeenId).apply()
             Result.success()
         } catch (_: Exception) {
             Result.retry()
