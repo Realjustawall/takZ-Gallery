@@ -71,7 +71,10 @@ android {
 }
 
 dependencies {
-  // Fully bundled offline image classification; no model download or Internet permission.\n  implementation("com.google.mlkit:image-labeling:17.0.9")\n  implementation("androidx.work:work-runtime-ktx:2.10.5")\n  // On-device, bundled Latin OCR model (does not use network at runtime).
+  // Fully bundled offline image classification; no model download or Internet permission.
+  implementation("com.google.mlkit:image-labeling:17.0.9")
+  implementation("androidx.work:work-runtime-ktx:2.10.5")
+  // On-device, bundled Latin OCR model (does not use network at runtime).
   implementation("com.google.mlkit:text-recognition:16.0.1")
   implementation(platform(libs.androidx.compose.bom))
   // implementation(platform(libs.firebase.bom))
