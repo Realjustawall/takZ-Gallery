@@ -85,7 +85,6 @@ fun SearchAndAiScreen(
     strings: BilingualStrings
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
-    val allMedia by viewModel.allMedia.collectAsStateWithLifecycle()
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
     val rankedResults by viewModel.rankedSearchResults.collectAsStateWithLifecycle()
     val referenceImage by viewModel.referenceImage.collectAsStateWithLifecycle()
@@ -97,67 +96,36 @@ fun SearchAndAiScreen(
     val isFa = settings.isPersianActive
     var selectedTagKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
 
-    val activeMedia = remember(allMedia) { allMedia.filter { !it.isTrashed && !it.isHidden } }
-
-    // Internal index of all tags in the library (never shown unless user searches)
-    val allLibraryTags = remember(activeMedia) {
-        val map = LinkedHashMap<String, Triple<String, String, Int>>()
-        for (item in activeMedia) {
-            val seenInItem = HashSet<String>()
-            for (aiTag in item.parseAiTags()) {
-                val key = PersianNormalizer.normalizeForSearch(aiTag.labelFa.ifBlank { aiTag.labelEn })
-                if (key.isNotBlank() && seenInItem.add(key)) {
-                    val prev = map[key]
-                    map[key] = Triple(aiTag.labelFa, aiTag.labelEn, (prev?.third ?: 0) + 1)
-                }
-            }
-            for (mTag in item.parseManualTags()) {
-                val key = PersianNormalizer.normalizeForSearch(mTag)
-                if (key.isNotBlank() && seenInItem.add(key)) {
-                    val prev = map[key]
-                    map[key] = Triple(mTag, mTag, (prev?.third ?: 0) + 1)
-                }
-            }
-        }
-        map.entries.map { (k, v) ->
-            DetectedTagItem(
-                keyNormalized = k,
-                labelFa = v.first,
-                labelEn = v.second,
-                count = v.third
-            )
-        }
-    }
-
-    // ONLY detect tags when user actually types a search query
-    val detectedTagsForQuery = remember(allLibraryTags, rankedResults, query) {
-        val normQuery = PersianNormalizer.normalizeForSearch(query)
-        if (normQuery.isBlank()) {
+    // Suggestions are intentionally limited to top hits, not every row in a large
+    // gallery. Parsing thousands of tags during composition previously caused jank.
+    val detectedTagsForQuery = remember(rankedResults, query, referenceImage) {
+        if (query.isBlank() || referenceImage != null) {
             emptyList()
         } else {
-            val queryTokens = normQuery.split(" ").filter { it.isNotBlank() }
-            // 1. Direct lexical tag match with what the user typed
-            val directMatches = allLibraryTags.filter { tag ->
-                val normFa = PersianNormalizer.normalizeForSearch(tag.labelFa)
-                val normEn = PersianNormalizer.normalizeForSearch(tag.labelEn)
-                normFa.contains(normQuery) ||
-                    normEn.contains(normQuery) ||
-                    normQuery.contains(normFa) ||
-                    normQuery.contains(normEn) ||
-                    queryTokens.any { tok -> tok.length >= 2 && (normFa.contains(tok) || normEn.contains(tok)) }
+            val normQuery = PersianNormalizer.normalizeForSearch(query)
+            val words = normQuery.split(" ").filter { it.length >= 2 }
+            val known = LinkedHashMap<String, DetectedTagItem>()
+            for (res in rankedResults.take(24)) {
+                val labels = res.media.parseAiTags().map { it.labelFa to it.labelEn } +
+                    res.media.parseManualTags().map { it to it }
+                for ((fa, en) in labels) {
+                    val key = PersianNormalizer.normalizeForSearch(en)
+                    if (key.isBlank()) continue
+                    val faNorm = PersianNormalizer.normalizeForSearch(fa)
+                    val matches = words.any { key.contains(it) || faNorm.contains(it) } ||
+                        normQuery.contains(key) || normQuery.contains(faNorm)
+                    if (!matches) continue
+                    val prev = known[key]
+                    known[key] = DetectedTagItem(
+                        keyNormalized = key,
+                        labelFa = fa,
+                        labelEn = en,
+                        count = (prev?.count ?: 0) + 1
+                    )
+                    if (known.size >= 48) break
+                }
             }
-
-            if (directMatches.isNotEmpty()) {
-                directMatches.take(6)
-            } else {
-                // 2. Semantic fallback: extract top tags from the highest-ranked AI matches for this query
-                val topSemanticItems = rankedResults.take(2).map { it.media }
-                val inferredKeys = topSemanticItems
-                    .flatMap { it.parseAiTags().take(2) }
-                    .map { PersianNormalizer.normalizeForSearch(it.labelFa.ifBlank { it.labelEn }) }
-                    .toSet()
-                allLibraryTags.filter { it.keyNormalized in inferredKeys }.take(4)
-            }
+            known.values.sortedByDescending { it.count }.take(6)
         }
     }
 
