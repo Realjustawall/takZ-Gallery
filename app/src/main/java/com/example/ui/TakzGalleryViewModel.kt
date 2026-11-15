@@ -174,9 +174,37 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     private val _searchFilters = MutableStateFlow(SearchRankingEngine.SearchFilters())
     val searchFilters: StateFlow<SearchRankingEngine.SearchFilters> = _searchFilters.asStateFlow()
 
+    data class ReferenceImage(val hash: Long, val color: String)
+
+    private val _referenceImage = MutableStateFlow<ReferenceImage?>(null)
+    val referenceImage: StateFlow<ReferenceImage?> = _referenceImage.asStateFlow()
+
+    fun searchUsingImage(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val bitmap = libraryManager.loadSampledBitmap(uri.toString(), 288)
+            if (bitmap == null) {
+                showStatusMessage("Could not read the selected image")
+                return@launch
+            }
+            val hash = similarityEngine.computePerceptualHash64(bitmap)
+            val color = imageTaggingEngine.detectDominantColorInfo(bitmap).second
+            bitmap.recycle()
+            _referenceImage.value = ReferenceImage(hash, color)
+            _searchQuery.value = ""
+        }
+    }
+
+    fun clearImageSearch() {
+        _referenceImage.value = null
+    }
+
     val rankedSearchResults: StateFlow<List<SearchRankingEngine.RankedSearchResult>> =
-        combine(allMedia, _searchQuery.debounce(240).distinctUntilChanged(), _searchFilters) { media, query, filters ->
-            searchRankingEngine.searchAndRank(media, query, filters)
+        combine(allMedia, _searchQuery.debounce(240).distinctUntilChanged(), _searchFilters, _referenceImage) { media, query, filters, reference ->
+            if (reference != null) {
+                searchRankingEngine.searchByExample(media, reference.hash, reference.color)
+            } else {
+                searchRankingEngine.searchAndRank(media, query, filters)
+            }
         }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Vault state
