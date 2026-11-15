@@ -23,6 +23,7 @@ import com.example.core.localization.AppLanguage
 import com.example.core.localization.CalendarSystem
 import com.example.core.media.MediaLibraryManager
 import com.example.core.ai.BackgroundAiScheduler
+import com.example.core.ai.RealImageTagger
 import com.example.core.media.PhotoEditPipelineState
 import com.example.core.media.PhotoProcessingEngine
 import com.example.core.security.VaultCryptoEngine
@@ -174,7 +175,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     private val _searchFilters = MutableStateFlow(SearchRankingEngine.SearchFilters())
     val searchFilters: StateFlow<SearchRankingEngine.SearchFilters> = _searchFilters.asStateFlow()
 
-    data class ReferenceImage(val hash: Long, val color: String)
+    data class ReferenceImage(val hash: Long, val color: String, val labels: Set<String>)
 
     private val _referenceImage = MutableStateFlow<ReferenceImage?>(null)
     val referenceImage: StateFlow<ReferenceImage?> = _referenceImage.asStateFlow()
@@ -186,11 +187,20 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
                 showStatusMessage("Could not read the selected image")
                 return@launch
             }
-            val hash = similarityEngine.computePerceptualHash64(bitmap)
-            val color = imageTaggingEngine.detectDominantColorInfo(bitmap).second
-            bitmap.recycle()
-            _referenceImage.value = ReferenceImage(hash, color)
-            _searchQuery.value = ""
+            try {
+                val hash = similarityEngine.computePerceptualHash64(bitmap)
+                val color = imageTaggingEngine.detectDominantColorInfo(bitmap).second
+                // Run real inference once for the reference photo, off the UI thread.
+                val labels = runCatching {
+                    RealImageTagger.classify(bitmap, "").asSequence()
+                        .filter { it.category.equals("Vision", ignoreCase = true) }
+                        .map { it.labelEn.lowercase() }.toSet()
+                }.getOrDefault(emptySet())
+                _referenceImage.value = ReferenceImage(hash, color, labels)
+                _searchQuery.value = ""
+            } finally {
+                bitmap.recycle()
+            }
         }
     }
 
@@ -201,7 +211,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     val rankedSearchResults: StateFlow<List<SearchRankingEngine.RankedSearchResult>> =
         combine(allMedia, _searchQuery.debounce(240).distinctUntilChanged(), _searchFilters, _referenceImage) { media, query, filters, reference ->
             if (reference != null) {
-                searchRankingEngine.searchByExample(media, reference.hash, reference.color)
+                searchRankingEngine.searchByExample(media, reference.hash, reference.color, reference.labels)
             } else {
                 searchRankingEngine.searchAndRank(media, query, filters)
             }
