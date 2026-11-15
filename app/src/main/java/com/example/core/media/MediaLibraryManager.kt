@@ -137,6 +137,12 @@ class MediaLibraryManager(
         )
     }
 
+    /** Metadata-only startup: retains default albums without ever running AI. */
+    suspend fun initializeLibraryMetadata() = withContext(Dispatchers.IO) {
+        ensureDefaultAlbums()
+        scanDeviceMediaStore()
+    }
+
     private suspend fun ensureDefaultAlbums() {
         val existing = dao.getVirtualAlbumsOnce()
         if (existing.isEmpty()) {
