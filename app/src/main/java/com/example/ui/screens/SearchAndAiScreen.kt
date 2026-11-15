@@ -155,50 +155,24 @@ fun SearchAndAiScreen(
         }
     }
 
-    // Automatically select the detected tag(s) as the user searches
-    LaunchedEffect(query, detectedTagsForQuery) {
-        val normQuery = PersianNormalizer.normalizeForSearch(query)
-        if (normQuery.isBlank()) {
-            selectedTagKeys = emptySet()
-        } else if (detectedTagsForQuery.isNotEmpty()) {
-            val exactOrPrimary = detectedTagsForQuery.filter { tag ->
-                val normFa = PersianNormalizer.normalizeForSearch(tag.labelFa)
-                val normEn = PersianNormalizer.normalizeForSearch(tag.labelEn)
-                normFa.contains(normQuery) || normEn.contains(normQuery) ||
-                    normQuery.contains(normFa) || normQuery.contains(normEn)
-            }
-            selectedTagKeys = if (exactOrPrimary.isNotEmpty()) {
-                exactOrPrimary.map { it.keyNormalized }.toSet()
-            } else {
-                setOf(detectedTagsForQuery.first().keyNormalized)
-            }
-        } else {
-            selectedTagKeys = emptySet()
-        }
+    // Suggestions are optional: never force a guessed label that hides relevant photos.
+    LaunchedEffect(query) {
+        selectedTagKeys = emptySet()
     }
 
-    // Filter results by the automatically detected/selected tags (or raw query if no tag matched)
-    val displayedResults = remember(rankedResults, selectedTagKeys, query) {
-        if (query.isBlank()) {
-            rankedResults
-        } else if (selectedTagKeys.isEmpty()) {
-            rankedResults
-        } else {
-            val tagFiltered = rankedResults.filter { res ->
-                val itemTagKeys = buildSet {
-                    res.media.parseAiTags().forEach {
-                        add(PersianNormalizer.normalizeForSearch(it.labelFa))
-                        add(PersianNormalizer.normalizeForSearch(it.labelEn))
-                    }
-                    res.media.parseManualTags().forEach {
-                        add(PersianNormalizer.normalizeForSearch(it))
-                    }
+    val displayedResults = remember(rankedResults, selectedTagKeys) {
+        if (selectedTagKeys.isEmpty()) rankedResults
+        else rankedResults.filter { result ->
+            val keys = buildSet {
+                result.media.parseAiTags().forEach { tag ->
+                    add(PersianNormalizer.normalizeForSearch(tag.labelEn))
+                    add(PersianNormalizer.normalizeForSearch(tag.labelFa))
                 }
-                selectedTagKeys.any { selKey ->
-                    itemTagKeys.any { it.contains(selKey) || selKey.contains(it) }
+                result.media.parseManualTags().forEach {
+                    add(PersianNormalizer.normalizeForSearch(it))
                 }
             }
-            if (tagFiltered.isNotEmpty()) tagFiltered else rankedResults
+            selectedTagKeys.any { it in keys }
         }
     }
 
@@ -264,7 +238,17 @@ fun SearchAndAiScreen(
                     .testTag("semantic_search_input")
             )
 
-            // Auto-detected & auto-selected tags appear ONLY when user is searching
+            Text(
+                text = strings.tr(
+                    "Try: cat on a sofa  •  \"invoice 2024\"  •  type:video  •  color:blue  •  after:2024-01-01",
+                    "نمونه: گربه روی مبل  •  \"شماره فاکتور\"  •  type:video  •  color:blue  •  after:2024-01-01"
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+
+            // Optional detected tags, never auto-selected
             AnimatedVisibility(visible = query.isNotBlank() && detectedTagsForQuery.isNotEmpty()) {
                 Column(modifier = Modifier.padding(top = 10.dp)) {
                     FlowRow(
