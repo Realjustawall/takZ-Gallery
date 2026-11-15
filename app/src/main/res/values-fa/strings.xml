@@ -1,0 +1,116 @@
+<resources>
+    <string name="app_name">takZ-Gallery</string>
+    <string name="app_tagline">استودیوی هوشمند و ۱۰۰٪ آفلاین عکس و ویدیو</string>
+
+    <!-- Navigation Tabs -->
+    <string name="nav_photos">تصاویر</string>
+    <string name="nav_albums">آلبوم‌ها</string>
+    <string name="nav_search">جستجوی هوشمند</string>
+    <string name="nav_cleanup">پاک‌سازی و ابزار</string>
+    <string name="nav_vault">گاوصندوق امن</string>
+    <string name="nav_settings">تنظیمات</string>
+
+    <!-- Gallery Home & Timeline -->
+    <string name="timeline_day">روزانه</string>
+    <string name="timeline_month">ماهانه</string>
+    <string name="timeline_year">سالانه</string>
+    <string name="layout_grid">شبکه‌ای</string>
+    <string name="layout_masonry">آجری (Masonry)</string>
+    <string name="layout_list">فهرستی</string>
+    <string name="filter_all">همه رسانه‌ها</string>
+    <string name="filter_favorites">برگزیده‌ها</string>
+    <string name="filter_videos">ویدیوها</string>
+    <string name="filter_recent">اخیر</string>
+    <string name="filter_trash">سطل زباله</string>
+    <string name="filter_hidden">مخفی‌شده‌ها</string>
+    <string name="memories_title">خاطرات و در چنین روزی</string>
+    <string name="slideshow_start">پخش اسلایدشو</string>
+    <string name="import_sample_media">افزودن تصاویر نمونه به گالری</string>
+    <string name="pick_photos_system">انتخاب با انتخابگر اندروید</string>
+    <string name="grant_media_permission">اعطای دسترسی به گالری</string>
+    <string name="permission_banner_desc">گالری تکز کاملاً آفلاین کار می‌کند. برای تحلیل تمام عکس‌های دستگاه دسترسی دهید یا از تصاویر نمونه داخلی استفاده کنید.</string>
+
+    <!-- AI Indexing & Search -->
+    <string name="ai_indexing_active">در حال پردازش هوش مصنوعی آفلاین…</string>
+    <string name="ai_indexing_complete">ایندکس هوش مصنوعی آماده است</string>
+    <string name="ai_indexing_paused">پردازش متوقف شد</string>
+    <string name="ai_pause">توقف موقت</string>
+    <string name="ai_resume">ادامه</string>
+    <string name="ai_reindex">بازخوانی کل کتابخانه</string>
+    <string name="search_placeholder">توصیف عکس به فارسی یا انگلیسی (مثلاً: ماشین قرمز کنار درخت)…</string>
+    <string name="semantic_match_badge">تطابق معنایی هوش مصنوعی</string>
+    <string name="keyword_match_badge">تطابق دقیق تگ / متن</string>
+    <string name="ocr_match_badge">تطابق متن داخل تصویر (OCR)</string>
+    <string name="recent_searches">جستجوهای اخیر</string>
+    <string name="clear_history">پاک‌سازی</string>
+    <string name="sample_queries_title">نمونه جستجوهای معنایی دوزبانه</string>
+
+    <!-- Photo Viewer & Metadata -->
+    <string name="viewer_edit">ویرایشگر عکس</string>
+    <string name="viewer_remove_bg">حذف پس‌زمینه</string>
+    <string name="viewer_ocr">استخراج متن (OCR)</string>
+    <string name="viewer_info">اطلاعات EXIF و تگ‌ها</string>
+    <string name="viewer_compare">مقایسه دو عکس</string>
+    <string name="viewer_share">اشتراک‌گذاری</string>
+    <string name="viewer_delete">انتقال به سطل زباله</string>
+    <string name="viewer_hide">مخفی کردن</string>
+    <string name="viewer_move_vault">انتقال به گاوصندوق رمزنگاری‌شده</string>
+    <string name="viewer_set_wallpaper">تنظیم تصویر زمینه</string>
+    <string name="add_custom_tag">افزودن تگ دستی</string>
+
+    <!-- Background Removal -->
+    <string name="bg_removal_title">حذف هوشمند و آفلاین پس‌زمینه</string>
+    <string name="bg_run_segmentation">اجرای جداسازی سوژه</string>
+    <string name="bg_edge_feather">نرمی لبه‌ها (Feather)</string>
+    <string name="bg_mask_smooth">هموارسازی ماسک</string>
+    <string name="bg_brush_erase">قلم پاک‌کن</string>
+    <string name="bg_brush_restore">قلم بازگردانی</string>
+    <string name="bg_mode_transparent">پس‌زمینه شفاف (PNG/WebP)</string>
+    <string name="bg_mode_solid">رنگ یکدست</string>
+    <string name="bg_mode_blur">مات‌سازی پس‌زمینه (بوکه)</string>
+    <string name="bg_export_png">ذخیره PNG شفاف</string>
+    <string name="bg_export_webp">ذخیره WebP شفاف</string>
+
+    <!-- Photo Editor -->
+    <string name="editor_title">ویرایشگر حرفه‌ای غیرمخرب</string>
+    <string name="editor_tab_adjust">نور و رنگ</string>
+    <string name="editor_tab_curves">منحنی‌های RGB</string>
+    <string name="editor_tab_hsl">تنظیمات HSL</string>
+    <string name="editor_tab_crop">برش و هندسه</string>
+    <string name="editor_tab_filters">فیلتر و افکت</string>
+    <string name="editor_tab_annotate">متن و نقاشی</string>
+    <string name="editor_save_copy">ذخیره نسخه ویرایش‌شده</string>
+    <string name="editor_reset">بازنشانی تغییرات</string>
+    <string name="editor_before_after">مقایسه قبل و بعد</string>
+
+    <!-- Video Player & Editor -->
+    <string name="video_studio_title">پخش‌کننده و ویرایشگر ویدیو</string>
+    <string name="video_trim">برش زمانی ویدیو</string>
+    <string name="video_speed">سرعت پخش</string>
+    <string name="video_extract_frame">استخراج فریم</string>
+    <string name="video_export_gif">تبدیل به تصویر متحرک GIF</string>
+
+    <!-- Smart Cleanup & Duplicates -->
+    <string name="cleanup_title">تحلیل فضا و یافتن عکس‌های تکراری</string>
+    <string name="duplicates_exact">فایل‌های کاملاً یکسان (SHA-256)</string>
+    <string name="duplicates_similar">عکس‌های مشابه بصری (pHash / AI)</string>
+    <string name="cleanup_screenshots">اسکرین‌شات‌ها و اسناد</string>
+    <string name="cleanup_blurry">شناسایی تصاویر تار و کم‌کیفیت</string>
+
+    <!-- Secure Vault -->
+    <string name="vault_title">گاوصندوق رمزنگاری‌شده AES-256</string>
+    <string name="vault_subtitle">رمزنگاری واقعی با Android Keystore و الگوریتم AES-GCM. رمز عبور با PBKDF2 ذخیره می‌شود.</string>
+    <string name="vault_unlock">بازگشایی گاوصندوق</string>
+    <string name="vault_set_pin">تعیین رمز گاوصندوق</string>
+    <string name="vault_lock_now">قفل فوری گاوصندوق</string>
+
+    <!-- Settings -->
+    <string name="settings_language">زبان برنامه</string>
+    <string name="settings_theme">پوسته ظاهری</string>
+    <string name="settings_calendar">تقویم (خورشیدی جلالی / میلادی)</string>
+    <string name="settings_accent">رنگ تاکیدی</string>
+    <string name="settings_columns">تعداد ستون‌های شبکه</string>
+    <string name="settings_corner_radius">گردی گوشه تصاویر</string>
+    <string name="settings_reduce_motion">کاهش انیمیشن‌ها</string>
+    <string name="settings_privacy_notice">تضمین عدم دسترسی به اینترنت: بدون سرور ابری، بدون ردیابی، هوش مصنوعی ۱۰۰٪ محلی.</string>
+</resources>

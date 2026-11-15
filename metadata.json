@@ -1,0 +1,6 @@
+{
+  "name": "takZ-Gallery",
+  "description": "گالری پیشرفته و ۱۰۰٪ آفلاین عکس و ویدیو با هوش مصنوعی محلی دوزبانه، حذف پس‌زمینه، ویرایشگر حرفه‌ای، تم سیاه نئونی و فونت وزیر.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

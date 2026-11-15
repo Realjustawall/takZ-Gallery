@@ -1,0 +1,13 @@
+Bundled Typography Licenses
+===========================
+1. Vazirmatn (res/font/vazirmatn.ttf)
+   - Author: Saber Rastikerdar
+   - License: SIL Open Font License 1.1 (OFL-1.1)
+
+2. Plus Jakarta Sans (res/font/plus_jakarta_sans.ttf)
+   - Author: Tokotype
+   - License: SIL Open Font License 1.1 (OFL-1.1)
+
+3. JetBrains Mono (res/font/jetbrains_mono.ttf)
+   - Author: JetBrains
+   - License: SIL Open Font License 1.1 (OFL-1.1)

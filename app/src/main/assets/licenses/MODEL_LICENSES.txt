@@ -1,0 +1,19 @@
+TakZ Gallery Bundled On-Device AI Models & Attribution
+======================================================
+1. takz_vision_embedder_int8.tflite (Version 1.0.0)
+   - Purpose: 64-D Multi-Scale Visual Feature & Semantic Concept Projection
+   - Quantization: INT8 symmetric (scale=0.015625)
+   - License: Apache License 2.0
+
+2. takz_multilingual_text_fa_en_int8.tflite & vocab_fa_en.json (Version 1.0.0)
+   - Purpose: Bilingual Persian (fa) & English (en) Cross-Modal Semantic Encoder
+   - Normalization: Persian Kaf/Yeh canonicalization, ZWNJ handling, Eastern/Western digit unification
+   - License: Apache License 2.0
+
+3. takz_foreground_segmentation_int8.tflite (Version 1.0.0)
+   - Purpose: Offline Salient Subject & Person Foreground Segmentation + Bilateral Edge Matting
+   - License: Apache License 2.0
+
+4. takz_ocr_fa_en_int8.tflite (Version 1.0.0)
+   - Purpose: Offline Bilingual Persian & English Text Line & Character Recognition Engine
+   - License: Apache License 2.0

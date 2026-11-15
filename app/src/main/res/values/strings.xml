@@ -1,0 +1,116 @@
+<resources>
+    <string name="app_name">takZ-Gallery</string>
+    <string name="app_tagline">استودیوی هوشمند و ۱۰۰٪ آفلاین عکس و ویدیو</string>
+
+    <!-- Navigation Tabs -->
+    <string name="nav_photos">Photos</string>
+    <string name="nav_albums">Albums</string>
+    <string name="nav_search">AI Search</string>
+    <string name="nav_cleanup">Studio &amp; Clean</string>
+    <string name="nav_vault">Vault</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Gallery Home & Timeline -->
+    <string name="timeline_day">Days</string>
+    <string name="timeline_month">Months</string>
+    <string name="timeline_year">Years</string>
+    <string name="layout_grid">Grid</string>
+    <string name="layout_masonry">Masonry</string>
+    <string name="layout_list">List</string>
+    <string name="filter_all">All Media</string>
+    <string name="filter_favorites">Favorites</string>
+    <string name="filter_videos">Videos</string>
+    <string name="filter_recent">Recent</string>
+    <string name="filter_trash">Trash</string>
+    <string name="filter_hidden">Hidden</string>
+    <string name="memories_title">On This Day &amp; Memories</string>
+    <string name="slideshow_start">Start Slideshow</string>
+    <string name="import_sample_media">Seed Device Gallery</string>
+    <string name="pick_photos_system">Pick via Android Photo Picker</string>
+    <string name="grant_media_permission">Grant Media Access</string>
+    <string name="permission_banner_desc">TakZ Gallery operates 100% offline. Grant MediaStore permission or use Photo Picker to index device photos alongside bundled studio samples.</string>
+
+    <!-- AI Indexing & Search -->
+    <string name="ai_indexing_active">On-Device AI Indexing…</string>
+    <string name="ai_indexing_complete">Offline AI Index Ready</string>
+    <string name="ai_indexing_paused">Indexing Paused</string>
+    <string name="ai_pause">Pause</string>
+    <string name="ai_resume">Resume</string>
+    <string name="ai_reindex">Re-index Library</string>
+    <string name="search_placeholder">Describe any photo in English or Persian (e.g., red car beside tree)…</string>
+    <string name="semantic_match_badge">Semantic AI Match</string>
+    <string name="keyword_match_badge">Exact Tag / OCR Match</string>
+    <string name="ocr_match_badge">OCR Text Match</string>
+    <string name="recent_searches">Recent Searches</string>
+    <string name="clear_history">Clear</string>
+    <string name="sample_queries_title">Try Bilingual Semantic Queries</string>
+
+    <!-- Photo Viewer & Metadata -->
+    <string name="viewer_edit">Photo Editor</string>
+    <string name="viewer_remove_bg">Remove BG</string>
+    <string name="viewer_ocr">Offline OCR</string>
+    <string name="viewer_info">EXIF &amp; AI Tags</string>
+    <string name="viewer_compare">Compare</string>
+    <string name="viewer_share">Share</string>
+    <string name="viewer_delete">Move to Trash</string>
+    <string name="viewer_hide">Hide Media</string>
+    <string name="viewer_move_vault">Encrypt to Vault</string>
+    <string name="viewer_set_wallpaper">Set Wallpaper</string>
+    <string name="add_custom_tag">Add Custom Tag</string>
+
+    <!-- Background Removal -->
+    <string name="bg_removal_title">Offline AI Background Removal</string>
+    <string name="bg_run_segmentation">Run Subject Segmentation</string>
+    <string name="bg_edge_feather">Edge Feathering</string>
+    <string name="bg_mask_smooth">Mask Smoothing</string>
+    <string name="bg_brush_erase">Erase Brush</string>
+    <string name="bg_brush_restore">Restore Brush</string>
+    <string name="bg_mode_transparent">Transparent PNG/WebP</string>
+    <string name="bg_mode_solid">Solid Backdrop</string>
+    <string name="bg_mode_blur">Bokeh Blur</string>
+    <string name="bg_export_png">Export Transparent PNG</string>
+    <string name="bg_export_webp">Export Alpha WebP</string>
+
+    <!-- Photo Editor -->
+    <string name="editor_title">Non-Destructive Photo Studio</string>
+    <string name="editor_tab_adjust">Light &amp; Color</string>
+    <string name="editor_tab_curves">RGB Curves</string>
+    <string name="editor_tab_hsl">HSL &amp; Grading</string>
+    <string name="editor_tab_crop">Crop &amp; Geometry</string>
+    <string name="editor_tab_filters">Filters &amp; FX</string>
+    <string name="editor_tab_annotate">Text &amp; Draw</string>
+    <string name="editor_save_copy">Export Processed Copy</string>
+    <string name="editor_reset">Reset Pipeline</string>
+    <string name="editor_before_after">Hold / Toggle Original</string>
+
+    <!-- Video Player & Editor -->
+    <string name="video_studio_title">Video Player &amp; Local Transcoder</string>
+    <string name="video_trim">Trim Range</string>
+    <string name="video_speed">Playback Speed</string>
+    <string name="video_extract_frame">Extract Frame</string>
+    <string name="video_export_gif">Export Animated GIF</string>
+
+    <!-- Smart Cleanup & Duplicates -->
+    <string name="cleanup_title">Storage Analyzer &amp; Duplicate Finder</string>
+    <string name="duplicates_exact">Exact SHA-256 Duplicates</string>
+    <string name="duplicates_similar">Perceptual &amp; Visual Near-Duplicates</string>
+    <string name="cleanup_screenshots">Screenshots &amp; Documents</string>
+    <string name="cleanup_blurry">Low Sharpness / Blurry Check</string>
+
+    <!-- Secure Vault -->
+    <string name="vault_title">AES-256 Encrypted Vault</string>
+    <string name="vault_subtitle">Android Keystore-backed AES-GCM encryption. PIN is PBKDF2-SHA256 hashed.</string>
+    <string name="vault_unlock">Unlock Vault</string>
+    <string name="vault_set_pin">Create Vault PIN</string>
+    <string name="vault_lock_now">Lock Vault</string>
+
+    <!-- Settings -->
+    <string name="settings_language">Interface Language</string>
+    <string name="settings_theme">Theme Mode</string>
+    <string name="settings_calendar">Calendar System (Gregorian / Jalali)</string>
+    <string name="settings_accent">Accent Color</string>
+    <string name="settings_columns">Grid Column Count</string>
+    <string name="settings_corner_radius">Thumbnail Corner Radius</string>
+    <string name="settings_reduce_motion">Reduce Motion</string>
+    <string name="settings_privacy_notice">Zero-Internet Guarantee: No cloud APIs, no telemetry, 100% local AI.</string>
+</resources>
