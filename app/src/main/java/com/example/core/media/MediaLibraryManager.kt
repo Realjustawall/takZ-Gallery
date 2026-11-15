@@ -411,13 +411,11 @@ class MediaLibraryManager(
         val sharpness = qualityEngine.estimateSharpnessScore(bitmap)
         val (domHex, domBucket) = imageTaggingEngine.detectDominantColorInfo(bitmap)
         val ocrResult = ocrEngine.analyzeImageText(bitmap, item.ocrText)
-        val embedding = imageEmbeddingEngine.extractVisualFeaturesAndEmbedding(
-            bitmap = bitmap,
-            fileNameHint = item.fileName,
-            ocrTextHint = ocrResult.fullText
-        )
-        // Real model inference, not hard-coded prototype labels.
+        // Real classifier inference determines the searchable visual concepts.
         val aiTags = com.example.core.ai.RealImageTagger.classify(bitmap, ocrResult.fullText)
+        // Text-space embedding is derived from measured labels, not guessed filename subjects.
+        val inferredConcepts = aiTags.joinToString(" ") { it.labelEn }
+        val embedding = textEmbeddingEngine.embedQuery(inferredConcepts + " " + ocrResult.fullText.take(256))
 
         val embCsv = embedding.joinToString(",") { "%.4f".format(java.util.Locale.US, it) }
         val tagsPipe = aiTags.joinToString("|") {
