@@ -1080,6 +1080,35 @@ class SearchRankingEngine(
             .thenByDescending { it.media.dateModifiedSec })
     }
 
+    /** Fast search-by-example using indexed 64-bit perceptual image hashes.
+     * Near duplicates, crops with small edits, and similar layouts are candidates.
+     * This is visual near-similarity, not open-vocabulary image understanding.
+     */
+    fun searchByExample(
+        allMedia: List<MediaItemEntity>,
+        referenceHash: Long,
+        referenceColor: String,
+        maxResults: Int = 120
+    ): List<RankedSearchResult> {
+        val ranked = ArrayList<RankedSearchResult>()
+        for (item in allMedia) {
+            if (item.isTrashed || item.isHidden || item.isVideo || !item.isIndexed) continue
+            val hash = item.perceptualHash64
+            // A zero hash is valid only in theory; older unindexed rows use zero as a sentinel.
+            if (hash == 0L) continue
+            val distance = java.lang.Long.bitCount(referenceHash xor hash)
+            val colorMatch = item.dominantColorBucket.equals(referenceColor, ignoreCase = true)
+            if (distance > 23 && !(colorMatch && distance <= 30)) continue
+            val similarity = (1f - distance.toFloat() / 64f).coerceIn(0f, 1f)
+            val score = similarity + if (colorMatch) 0.06f else 0f
+            ranked.add(RankedSearchResult(
+                item, score, similarity, MatchReason.SEMANTIC_AI,
+                "Visual match · ${(similarity * 100).toInt()}%"
+            ))
+        }
+        return ranked.sortedByDescending { it.finalScore }.take(maxResults)
+    }
+
     private fun matchesOrientation(item: MediaItemEntity, orientation: String?): Boolean {
         if (orientation == null) return true
         return when (orientation) {
