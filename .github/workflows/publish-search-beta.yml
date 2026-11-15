@@ -1,0 +1,49 @@
+name: Publish Advanced Image Search Beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-search-beta.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified advanced search APK artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apks
+          gh run download 43743033581 --repo "${{ github.repository }}" \
+            --name takz-optimized-signed-per-abi --dir apks
+          mapfile -t files < <(find apks -maxdepth 2 -type f -name '*.apk' | sort)
+          test "${#files[@]}" -eq 4
+          for file in "${files[@]}"; do
+            bytes=$(stat -c%s "$file")
+            echo "$file : $bytes bytes"
+            test "$bytes" -gt 1000000
+            test "$bytes" -lt 50000000
+          done
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            test -s "apks/app-${abi}-release.apk"
+          done
+      - name: Publish v0.3.0 beta
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v0.3.0-beta apks/*.apk \
+            --repo "${{ github.repository }}" \
+            --target 2ff62ecd8be9c64a84420ec5bef801570f3712b7 \
+            --title "TakZ Gallery v0.3.0 Beta — Advanced Image Search" \
+            --prerelease \
+            --notes "Advanced image search beta. New: search by a reference photo (perceptual hash + ML Kit labels), Persian/English search, OCR phrase matching, advanced operators (type/color/folder/date/orientation), improved ranking, optional tag suggestions, reduced main-thread tag scans, background idle AI controls. Tested APKs from successful CI run 43743033581; signed using a CI debug key, not a production release key. Separate optimized APKs for four Android CPU architectures, each below 50 MB. Select arm64-v8a on most modern phones. Warning: model-based search is not an open-ended CLIP/SigLIP embedding system; device performance and accuracy have not been field-tested. Installing over an older beta may fail due to differing debug signing keys. Back up data before reinstalling."
