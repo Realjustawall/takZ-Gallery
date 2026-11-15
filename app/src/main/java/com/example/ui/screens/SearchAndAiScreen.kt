@@ -1,6 +1,8 @@
 package com.example.ui.screens
 
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,6 +88,10 @@ fun SearchAndAiScreen(
     val allMedia by viewModel.allMedia.collectAsStateWithLifecycle()
     val query by viewModel.searchQuery.collectAsStateWithLifecycle()
     val rankedResults by viewModel.rankedSearchResults.collectAsStateWithLifecycle()
+    val referenceImage by viewModel.referenceImage.collectAsStateWithLifecycle()
+    val photoSearchPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? -> if (uri != null) viewModel.searchUsingImage(uri) }
     val history by viewModel.searchHistory.collectAsStateWithLifecycle()
 
     val isFa = settings.isPersianActive
@@ -247,6 +253,45 @@ fun SearchAndAiScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
             )
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AssistChip(
+                    onClick = {
+                        photoSearchPicker.launch(
+                            ActivityResultContracts.PickVisualMedia.Request(
+                                ActivityResultContracts.PickVisualMedia.ImageOnly
+                            )
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = null,
+                            modifier = Modifier.size(16.dp))
+                    },
+                    label = {
+                        Text(strings.tr("Search using a photo", "جست‌وجو با انتخاب عکس"))
+                    },
+                    modifier = Modifier.testTag("search_by_photo")
+                )
+                if (referenceImage != null) {
+                    TextButton(onClick = { viewModel.clearImageSearch() }) {
+                        Text(strings.tr("Clear photo", "حذف عکس مرجع"))
+                    }
+                }
+            }
+            if (referenceImage != null) {
+                Text(
+                    strings.tr(
+                        "Finding visually similar photos already indexed on this device",
+                        "جست‌وجوی عکس‌های مشابهِ پردازش‌شده در این دستگاه"
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
             // Optional detected tags, never auto-selected
             AnimatedVisibility(visible = query.isNotBlank() && detectedTagsForQuery.isNotEmpty()) {
