@@ -904,19 +904,14 @@ class ImageQualityEngine {
 class SearchRankingEngine(
     private val textEmbeddingEngine: TextEmbeddingEngine
 ) {
-    enum class MatchReason {
-        SEMANTIC_AI,
-        EXACT_TAG,
-        OCR_TEXT,
-        FILENAME_OR_FILTER
-    }
+    enum class MatchReason { SEMANTIC_AI, EXACT_TAG, OCR_TEXT, FILENAME_OR_FILTER }
 
     data class SearchFilters(
         val dominantColor: String? = null,
         val onlyFavorites: Boolean = false,
         val onlyVideos: Boolean = false,
         val onlyWithOcrText: Boolean = false,
-        val orientation: String? = null, // "LANDSCAPE", "PORTRAIT", "SQUARE"
+        val orientation: String? = null,
         val folderName: String? = null,
         val minSemanticScore: Float = 0.24f
     )
@@ -929,89 +924,160 @@ class SearchRankingEngine(
         val matchedHighlight: String
     )
 
+    /** Input syntax:
+     * cat on a sofa, "exact OCR phrase", type:video, type:photo,
+     * color:red, folder:Camera, after:2024-01-01, before:2025-01-01,
+     * favorite:true, orientation:portrait, has:text.
+     * Modifiers are AND-combined and text remains natural-language searchable.
+     */
+    private data class ParsedQuery(
+        val text: String,
+        val phrases: List<String>,
+        val type: String? = null,
+        val color: String? = null,
+        val folder: String? = null,
+        val orientation: String? = null,
+        val after: Long? = null,
+        val before: Long? = null,
+        val favorite: Boolean = false,
+        val hasText: Boolean = false
+    )
+
+    private fun parseQuery(input: String): ParsedQuery {
+        val tokens = Regex("\\"[^\\"]+\\"|\\S+").findAll(input).map { it.value }.toList()
+        val text = ArrayList<String>()
+        val phrases = ArrayList<String>()
+        var type: String? = null
+        var color: String? = null
+        var folder: String? = null
+        var orientation: String? = null
+        var after: Long? = null
+        var before: Long? = null
+        var favorite = false
+        var hasText = false
+        for (token in tokens) {
+            val divider = token.indexOf(':')
+            val key = if (divider > 0) token.substring(0, divider).lowercase() else ""
+            val value = if (divider > 0) token.substring(divider + 1) else ""
+            val consumed = when (key) {
+                "type" -> if (value.lowercase() in setOf("image", "photo", "video")) { type = value.lowercase(); true } else false
+                "color" -> if (value.isNotBlank()) { color = value; true } else false
+                "folder" -> if (value.isNotBlank()) { folder = value; true } else false
+                "orientation" -> if (value.uppercase() in setOf("PORTRAIT", "LANDSCAPE", "SQUARE")) {
+                    orientation = value.uppercase(); true
+                } else false
+                "favorite" -> if (value.lowercase() in setOf("true", "1", "yes")) { favorite = true; true } else false
+                "has" -> if (value.lowercase() in setOf("text", "ocr")) { hasText = true; true } else false
+                "after", "before" -> {
+                    val date = runCatching {
+                        java.time.LocalDate.parse(value).atStartOfDay(java.time.ZoneOffset.UTC).toEpochSecond()
+                    }.getOrNull()
+                    if (date != null) {
+                        if (key == "after") after = date else before = date
+                        true
+                    } else false
+                }
+                else -> false
+            }
+            if (!consumed) {
+                if (token.startsWith('"') && token.endsWith('"') && token.length > 2) {
+                    phrases.add(PersianNormalizer.normalizeForSearch(token.drop(1).dropLast(1)))
+                    text.add(token.drop(1).dropLast(1))
+                } else text.add(token)
+            }
+        }
+        return ParsedQuery(
+            text = PersianNormalizer.normalizeForSearch(text.joinToString(" ")),
+            phrases = phrases, type = type, color = color, folder = folder,
+            orientation = orientation, after = after, before = before,
+            favorite = favorite, hasText = hasText
+        )
+    }
+
     fun searchAndRank(
         allMedia: List<MediaItemEntity>,
         rawQuery: String,
         filters: SearchFilters = SearchFilters(),
         includeHidden: Boolean = false
     ): List<RankedSearchResult> {
-        val candidates = allMedia.filter { item ->
-            !item.isTrashed &&
-                (includeHidden || !item.isHidden) &&
-                (!filters.onlyFavorites || item.isFavorite) &&
+        val parsed = parseQuery(rawQuery)
+        val candidates = allMedia.asSequence().filter { item ->
+            !item.isTrashed && (includeHidden || !item.isHidden) &&
+                (!filters.onlyFavorites && !parsed.favorite || item.isFavorite) &&
                 (!filters.onlyVideos || item.isVideo) &&
-                (!filters.onlyWithOcrText || item.ocrText.isNotBlank()) &&
-                (filters.dominantColor == null || item.dominantColorBucket.equals(filters.dominantColor, ignoreCase = true)) &&
-                (filters.folderName == null || item.folderName.equals(filters.folderName, ignoreCase = true)) &&
-                matchesOrientation(item, filters.orientation)
+                (!filters.onlyWithOcrText && !parsed.hasText || item.ocrText.isNotBlank()) &&
+                (filters.dominantColor == null || item.dominantColorBucket.equals(filters.dominantColor, true)) &&
+                (parsed.color == null || item.dominantColorBucket.equals(parsed.color, true)) &&
+                (filters.folderName == null || item.folderName.equals(filters.folderName, true)) &&
+                (parsed.folder == null || PersianNormalizer.normalizeForSearch(item.folderName).contains(
+                    PersianNormalizer.normalizeForSearch(parsed.folder))) &&
+                (parsed.type == null || (if (parsed.type == "video") item.isVideo else !item.isVideo)) &&
+                matchesOrientation(item, filters.orientation) &&
+                matchesOrientation(item, parsed.orientation) &&
+                (parsed.after == null || item.dateModifiedSec >= parsed.after) &&
+                (parsed.before == null || item.dateModifiedSec < parsed.before)
+        }.toList()
+
+        if (parsed.text.isBlank()) return candidates.map {
+            RankedSearchResult(it, 1f, 0f, MatchReason.FILENAME_OR_FILTER, it.folderName)
         }
-
-        val normalizedQuery = PersianNormalizer.normalizeForSearch(rawQuery)
-        if (normalizedQuery.isBlank()) {
-            return candidates.map {
-                RankedSearchResult(
-                    media = it,
-                    finalScore = 1f,
-                    semanticSimilarity = 1f,
-                    matchReason = MatchReason.FILENAME_OR_FILTER,
-                    matchedHighlight = it.folderName
-                )
-            }
-        }
-
-        val queryEmbedding = textEmbeddingEngine.embedQuery(normalizedQuery)
-        val queryTokens = normalizedQuery.split(" ").filter { it.length >= 2 }
-
-        val ranked = mutableListOf<RankedSearchResult>()
+        val tokens = parsed.text.split(Regex("\\s+")).filter { it.length >= 2 }.distinct().take(24)
+        if (tokens.isEmpty()) return emptyList()
+        val queryEmbedding = textEmbeddingEngine.embedQuery(parsed.text)
+        val ranked = ArrayList<RankedSearchResult>()
         for (item in candidates) {
-            val itemEmb = item.parseEmbedding()
-            val semanticSim = QuantizedTensorModel.cosineSimilarity(queryEmbedding, itemEmb)
-
-            val normOcr = PersianNormalizer.normalizeForSearch(item.ocrText)
-            val normTags = PersianNormalizer.normalizeForSearch(item.aiTagsPipe + " " + item.manualTagsCsv)
-            val normFile = PersianNormalizer.normalizeForSearch(item.fileName + " " + item.folderName)
-
-            val ocrMatches = queryTokens.count { normOcr.contains(it) }
-            val tagMatches = queryTokens.count { normTags.contains(it) }
-            val fileMatches = queryTokens.count { normFile.contains(it) }
-
-            val ocrBoost = if (ocrMatches > 0) 0.45f * (ocrMatches.toFloat() / queryTokens.size.coerceAtLeast(1)) else 0f
-            val tagBoost = if (tagMatches > 0) 0.38f * (tagMatches.toFloat() / queryTokens.size.coerceAtLeast(1)) else 0f
-            val fileBoost = if (fileMatches > 0) 0.25f * (fileMatches.toFloat() / queryTokens.size.coerceAtLeast(1)) else 0f
-
-            // Prefer labels confirmed by the on-device classifier and OCR; do not let
-            // a weak vocabulary-projection cosine score overwhelm real text matches.
-            val combinedScore = semanticSim * 0.20f + ocrBoost + tagBoost * 1.6f + fileBoost
-            if ((item.isIndexed && semanticSim >= maxOf(filters.minSemanticScore, 0.56f)) ||
-                ocrMatches > 0 || tagMatches > 0 || fileMatches > 0) {
-                val reason = when {
-                    ocrMatches > 0 && ocrBoost >= semanticSim * 0.5f -> MatchReason.OCR_TEXT
-                    tagMatches > 0 && semanticSim < 0.45f -> MatchReason.EXACT_TAG
-                    semanticSim >= filters.minSemanticScore -> MatchReason.SEMANTIC_AI
-                    else -> MatchReason.FILENAME_OR_FILTER
-                }
-                val highlight = when (reason) {
-                    MatchReason.OCR_TEXT -> item.ocrText.lines().firstOrNull { it.isNotBlank() }?.take(42) ?: "OCR"
-                    MatchReason.SEMANTIC_AI -> {
-                        val topTag = item.parseAiTags().firstOrNull()
-                        if (topTag != null) "${topTag.labelEn} / ${topTag.labelFa}" else "64-D Vector Match"
-                    }
-                    MatchReason.EXACT_TAG -> item.manualTagsCsv.ifBlank { item.parseAiTags().joinToString { it.labelEn } }
-                    MatchReason.FILENAME_OR_FILTER -> item.fileName
-                }
-                ranked.add(
-                    RankedSearchResult(
-                        media = item,
-                        finalScore = combinedScore,
-                        semanticSimilarity = semanticSim.coerceIn(0f, 1f),
-                        matchReason = reason,
-                        matchedHighlight = highlight
-                    )
-                )
+            val normalizedFile = PersianNormalizer.normalizeForSearch(item.fileName + " " + item.folderName)
+            val normalizedOcr = PersianNormalizer.normalizeForSearch(item.ocrText)
+            val manual = PersianNormalizer.normalizeForSearch(item.manualTagsCsv)
+            val tags = item.parseAiTags()
+            val normalizedLabels = tags.map {
+                PersianNormalizer.normalizeForSearch(it.labelEn + " " + it.labelFa) to it.confidence.coerceIn(0f, 1f)
             }
-        }
+            fun coverage(haystack: String): Float =
+                tokens.count { token -> haystack.contains(token) }.toFloat() / tokens.size
 
-        return ranked.sortedByDescending { it.finalScore }
+            val fileScore = coverage(normalizedFile)
+            val ocrScore = coverage(normalizedOcr)
+            val manualScore = coverage(manual)
+            // Use classifier confidence, not the mere presence of a generic tag.
+            val labelScore = tokens.sumOf { token ->
+                normalizedLabels.filter { (label, _) -> label.contains(token) }
+                    .maxOfOrNull { (_, conf) -> conf.toDouble() } ?: 0.0
+            }.toFloat() / tokens.size
+            val phraseInFile = parsed.phrases.count { normalizedFile.contains(it) }
+            val phraseInOcr = parsed.phrases.count { normalizedOcr.contains(it) }
+            val phraseInLabel = parsed.phrases.count { phrase -> normalizedLabels.any { it.first.contains(phrase) } }
+            val phraseBoost = (phraseInOcr * 0.65f + phraseInLabel * 0.55f + phraseInFile * 0.4f)
+                .coerceAtMost(1f)
+            // Our compact vector is a coarse semantic hint, not a CLIP-class image embedding.
+            // Never count empty/unindexed vectors as semantic evidence.
+            val semantic = if (item.isIndexed && item.embeddingVectorCsv.isNotBlank()) {
+                QuantizedTensorModel.cosineSimilarity(queryEmbedding, item.parseEmbedding()).coerceIn(0f, 1f)
+            } else 0f
+            val strongSemantic = semantic >= maxOf(0.56f, filters.minSemanticScore)
+            if (fileScore == 0f && ocrScore == 0f && manualScore == 0f &&
+                labelScore == 0f && phraseBoost == 0f && !strongSemantic) continue
+
+            val score = fileScore * 0.90f + ocrScore * 1.15f + manualScore * 1.3f +
+                labelScore * 1.35f + phraseBoost + (if (strongSemantic) semantic * 0.3f else 0f)
+            val reason = when {
+                manualScore >= labelScore && manualScore > 0f -> MatchReason.EXACT_TAG
+                ocrScore > labelScore && ocrScore > fileScore -> MatchReason.OCR_TEXT
+                labelScore > 0f -> MatchReason.EXACT_TAG
+                fileScore > 0f -> MatchReason.FILENAME_OR_FILTER
+                else -> MatchReason.SEMANTIC_AI
+            }
+            val highlight = when (reason) {
+                MatchReason.OCR_TEXT -> item.ocrText.take(100)
+                MatchReason.EXACT_TAG -> tags.maxByOrNull { it.confidence }?.labelEn
+                    ?: item.manualTagsCsv.take(100)
+                MatchReason.SEMANTIC_AI -> tags.firstOrNull()?.labelEn ?: "Semantic match"
+                MatchReason.FILENAME_OR_FILTER -> item.fileName
+            }
+            ranked.add(RankedSearchResult(item, score, semantic, reason, highlight))
+        }
+        return ranked.sortedWith(compareByDescending<RankedSearchResult> { it.finalScore }
+            .thenByDescending { it.media.dateModifiedSec })
     }
 
     private fun matchesOrientation(item: MediaItemEntity, orientation: String?): Boolean {
@@ -1019,7 +1085,8 @@ class SearchRankingEngine(
         return when (orientation) {
             "LANDSCAPE" -> item.width > item.height
             "PORTRAIT" -> item.height > item.width
-            "SQUARE" -> abs(item.width - item.height) <= min(item.width, item.height) * 0.15
+            "SQUARE" -> item.width > 0 && item.height > 0 &&
+                abs(item.width - item.height) <= min(item.width, item.height) * 0.15
             else -> true
         }
     }
