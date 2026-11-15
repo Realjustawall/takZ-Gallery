@@ -175,7 +175,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
     init {
         BackgroundAiScheduler.schedule(context)
         // Only MediaStore metadata is loaded here; photo decode, OCR and AI stay idle-only.
-        viewModelScope.launch(Dispatchers.IO) { libraryManager.scanDeviceMediaStore() }
+        viewModelScope.launch(Dispatchers.IO) { libraryManager.initializeLibraryMetadata() }
     }
 
     fun refreshGalleryAfterPermission() {
