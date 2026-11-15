@@ -1,15 +1,8 @@
-name: Android CI and signed test APK
+name: TakZ Gallery Android CI
 
 on:
   push:
     branches: [main]
-    paths:
-      - 'app/**'
-      - 'gradle/**'
-      - 'build.gradle.kts'
-      - 'settings.gradle.kts'
-      - 'gradle.properties'
-      - 'scripts/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -20,30 +13,39 @@ permissions:
 jobs:
   test-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Configure JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Configure Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.3.1'
-      - uses: android-actions/setup-android@v3
-      - name: Generate local models
+      - name: Configure Android SDK (without obsolete tools package)
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+      - name: Export bundled offline assets
         run: python3 scripts/export_quantized_models.py
-      - name: Run tests
-        run: gradle --no-daemon :app:testDebugUnitTest
-      - name: Build Android signed debug APK
-        run: gradle --no-daemon :app:assembleDebug
+      - name: Run unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest --stacktrace
+      - name: Build signed debug APK
+        run: gradle --no-daemon :app:assembleDebug --stacktrace
       - name: Verify APK signature
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
           test -s "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
-      - uses: actions/upload-artifact@v4
+          APKSIGNER="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose "$APK"
+      - name: Upload signed debug APK
+        uses: actions/upload-artifact@v4
         with:
-          name: takz-signed-debug-apk
+          name: TakZ-Gallery-signed-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
