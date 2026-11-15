@@ -3,6 +3,9 @@ package com.example.core.ai
 import android.content.Context
 import android.graphics.Bitmap
 import android.Manifest
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Build
 import android.content.pm.PackageManager
 import androidx.work.Constraints
@@ -81,7 +84,6 @@ object BackgroundAiScheduler {
 
     fun schedule(context: Context) {
         val constraints = Constraints.Builder()
-            .setRequiresCharging(true)
             .setRequiresDeviceIdle(true)
             .setRequiresBatteryNotLow(true)
             .setRequiresStorageNotLow(true)
@@ -97,7 +99,7 @@ object BackgroundAiScheduler {
 }
 
 /**
- * A bounded indexing pass. WorkManager enforces charging + device-idle before a pass.
+ * A bounded indexing pass. WorkManager enforces device-idle and healthy battery.
  * All image decoding and inference happen off the main thread.
  * Stored tags are capped, so the database does not grow with unbounded vocabulary.
  */
@@ -135,17 +137,24 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
                 manager.scanDeviceMediaStore()
                 prefs.edit().putLong("last_scan_ms", now).apply()
             }
-            // Bound CPU usage for each idle pass.
+            // Keep unplugged idle sessions very short; use the longer budget only on power.
+            val status = context.registerReceiver(
+                null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+            )?.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                status == BatteryManager.BATTERY_STATUS_FULL
+            val budgetMs = if (charging) 90_000L else 20_000L
+            val maxItems = if (charging) 40 else 8
             val started = System.currentTimeMillis()
             val cursor = prefs.getLong("index_cursor_id", 0L)
-            val pending = dao.getPendingImageIndexAfter(cursor, 40)
-                .ifEmpty { dao.getPendingImageIndexAfter(0L, 40) }
+            val pending = dao.getPendingImageIndexAfter(cursor, maxItems)
+                .ifEmpty { dao.getPendingImageIndexAfter(0L, maxItems) }
             if (pending.isEmpty()) return@withContext Result.success()
             val updated = mutableListOf<com.example.core.database.MediaItemEntity>()
             var lastSeenId = cursor
             for (item in pending) {
                 coroutineContext.ensureActive()
-                if (isStopped || System.currentTimeMillis() - started > 90_000L) break
+                if (isStopped || System.currentTimeMillis() - started > budgetMs) break
                 lastSeenId = item.id
                 try {
                     updated += manager.runAiAnalysisForItem(item)
