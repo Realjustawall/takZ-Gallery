@@ -315,6 +315,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
 
     // Search operations
     fun updateSearchQuery(q: String) {
+        if (q.isNotBlank()) _referenceImage.value = null
         _searchQuery.value = q
     }
 
