@@ -64,6 +64,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -92,6 +93,7 @@ import com.example.core.media.StickerItemData
 import com.example.ui.TakzGalleryViewModel
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -109,6 +111,8 @@ fun PhotoEditorScreen(
     var activeTab by remember(resolvedInitialTab) { mutableStateOf(resolvedInitialTab) }
     var sourceBitmap by remember(item.id) { mutableStateOf<Bitmap?>(null) }
     var renderedBitmap by remember(item.id) { mutableStateOf<Bitmap?>(null) }
+    var fastSourceBitmap by remember(item.id) { mutableStateOf<Bitmap?>(null) }
+    var isPreviewRendering by remember(item.id) { mutableStateOf(false) }
     var showOriginalBefore by remember { mutableStateOf(false) }
 
     // Non-destructive PhotoEditPipelineState with Undo/Redo stack
@@ -117,10 +121,17 @@ fun PhotoEditorScreen(
     }
     val undoStack = remember { mutableStateListOf<PhotoEditPipelineState>() }
     val redoStack = remember { mutableStateListOf<PhotoEditPipelineState>() }
+    var lastAdjustmentAt by remember(item.id) { mutableLongStateOf(0L) }
 
     fun updatePipeline(newState: PhotoEditPipelineState) {
-        undoStack.add(pipelineState)
-        if (undoStack.size > 25) undoStack.removeAt(0)
+        if (newState == pipelineState) return
+        val now = android.os.SystemClock.uptimeMillis()
+        // A slider gesture belongs to ONE undo entry, rather than 60+ entries a second.
+        if (undoStack.isEmpty() || now - lastAdjustmentAt > 650L) {
+            undoStack.add(pipelineState)
+            if (undoStack.size > 25) undoStack.removeAt(0)
+        }
+        lastAdjustmentAt = now
         redoStack.clear()
         pipelineState = newState
     }
@@ -156,22 +167,59 @@ fun PhotoEditorScreen(
     var activePenColorInt by remember { mutableIntStateOf(android.graphics.Color.parseColor("#3E82F7")) }
     var activePenThickness by remember { mutableFloatStateOf(0.012f) }
 
-    // Load working source bitmap
+    // Decode off the UI thread. A cached 420px working copy provides immediate
+    // low-cost previews while the 960px source gives a detailed settled preview.
     LaunchedEffect(item.id) {
-        withContext(Dispatchers.IO) {
-            val loaded = viewModel.libraryManager.loadSampledBitmap(item.contentUri, maxDimension = 960)
-            sourceBitmap = loaded
-            if (loaded != null) {
-                renderedBitmap = PhotoProcessingEngine.renderPipeline(loaded, pipelineState)
+        sourceBitmap = null
+        renderedBitmap = null
+        fastSourceBitmap = null
+        val loaded = withContext(Dispatchers.IO) {
+            viewModel.libraryManager.loadSampledBitmap(item.contentUri, maxDimension = 960)
+        }
+        sourceBitmap = loaded
+        fastSourceBitmap = loaded?.let { original ->
+            withContext(Dispatchers.Default) {
+                val longest = maxOf(original.width, original.height)
+                if (longest <= 420) original else {
+                    val scale = 420f / longest
+                    Bitmap.createScaledBitmap(
+                        original,
+                        (original.width * scale).toInt().coerceAtLeast(1),
+                        (original.height * scale).toInt().coerceAtLeast(1),
+                        true
+                    )
+                }
             }
         }
     }
 
-    // Recompute Photo Studio preview when pipelineState changes
-    LaunchedEffect(sourceBitmap, pipelineState) {
+    // Latest-state-wins preview: obsolete renders cannot replace newer adjustments.
+    // During slider movement only the 420px preview is computed. Once the gesture
+    // settles, perform the same image pipeline at 960px with the original source.
+    LaunchedEffect(sourceBitmap, fastSourceBitmap, pipelineState) {
         val src = sourceBitmap ?: return@LaunchedEffect
-        withContext(Dispatchers.Default) {
-            renderedBitmap = PhotoProcessingEngine.renderPipeline(src, pipelineState)
+        val quick = fastSourceBitmap ?: return@LaunchedEffect
+        if (pipelineState.isIdentity()) {
+            renderedBitmap = src
+            isPreviewRendering = false
+            return@LaunchedEffect
+        }
+        isPreviewRendering = true
+        try {
+            delay(45L)
+            val draft = withContext(Dispatchers.Default) {
+                PhotoProcessingEngine.renderPipeline(quick, pipelineState)
+            }
+            renderedBitmap = draft
+            delay(240L)
+            if (quick !== src) {
+                val refined = withContext(Dispatchers.Default) {
+                    PhotoProcessingEngine.renderPipeline(src, pipelineState)
+                }
+                renderedBitmap = refined
+            }
+        } finally {
+            isPreviewRendering = false
         }
     }
 
@@ -262,6 +310,7 @@ fun PhotoEditorScreen(
                                 val prev = undoStack.removeAt(undoStack.lastIndex)
                                 redoStack.add(pipelineState)
                                 pipelineState = prev
+                                lastAdjustmentAt = 0L
                             }
                         }
                     ) {
@@ -275,6 +324,7 @@ fun PhotoEditorScreen(
                                 val next = redoStack.removeAt(redoStack.lastIndex)
                                 undoStack.add(pipelineState)
                                 pipelineState = next
+                                lastAdjustmentAt = 0L
                             }
                         }
                     ) {
