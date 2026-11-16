@@ -1823,8 +1823,6 @@ private fun StickersPenAndTextControls(
     }
 }
 
-@Composable
-
 // ContentScale.Fit letterboxes the image: map touches to actual displayed
 // pixels, not the full viewport. Ignore taps in the padding around the photo.
 private fun mapPreviewTouch(
@@ -1848,6 +1846,7 @@ private fun mapPreviewTouch(
     return x to y
 }
 
+@Composable
 private fun EditorSliderRow(
     label: String,
     value: Float,
