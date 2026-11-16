@@ -477,8 +477,10 @@ fun PhotoEditorScreen(
                 .clip(RoundedCornerShape(18.dp)),
             contentAlignment = Alignment.Center
         ) {
-            // Transparency checkerboard background
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            // Only draw transparency tiles when the user is editing alpha.
+            // The normal editor previously redrew hundreds of tiles on each frame.
+            if (activeTab == "BG_REMOVE" && aiToolMode == "CUTOUT" && bgMode == "TRANSPARENT") {
+                Canvas(modifier = Modifier.fillMaxSize()) {
                 val tile = 20.dp.toPx()
                 val cols = (size.width / tile).toInt() + 1
                 val rows = (size.height / tile).toInt() + 1
@@ -492,6 +494,8 @@ fun PhotoEditorScreen(
                         )
                     }
                 }
+            }
+
             }
 
             val displayBitmap = when {
