@@ -94,6 +94,8 @@ import com.example.ui.TakzGalleryViewModel
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -208,13 +210,13 @@ fun PhotoEditorScreen(
         try {
             delay(45L)
             val draft = withContext(Dispatchers.Default) {
-                PhotoProcessingEngine.renderPipeline(quick, pipelineState)
+                PhotoProcessingEngine.renderPipeline(quick, pipelineState) { coroutineContext[Job]?.isActive == false }
             }
             renderedBitmap = draft
             delay(240L)
             if (quick !== src) {
                 val refined = withContext(Dispatchers.Default) {
-                    PhotoProcessingEngine.renderPipeline(src, pipelineState)
+                    PhotoProcessingEngine.renderPipeline(src, pipelineState) { coroutineContext[Job]?.isActive == false }
                 }
                 renderedBitmap = refined
             }
