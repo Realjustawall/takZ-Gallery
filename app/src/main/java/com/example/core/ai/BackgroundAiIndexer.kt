@@ -14,6 +14,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.NetworkType
 import com.example.core.database.TakzDatabase
@@ -80,7 +81,7 @@ object RealImageTagger {
 }
 
 object BackgroundAiScheduler {
-    private const val NAME = "takz-idle-ai-indexing-v2"
+    const val NAME = "takz-idle-ai-indexing-v2"
 
     private const val PREFS = "takz_background_ai_v2"
 
@@ -164,11 +165,15 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
             val pending = dao.getPendingImageIndexAfter(cursor, maxItems)
                 .ifEmpty { dao.getPendingImageIndexAfter(0L, maxItems) }
             if (pending.isEmpty()) return@withContext Result.success()
+            var completedThisPass = 0
+            setProgress(workDataOf("processedInPass" to 0, "batchSize" to pending.size,
+                "currentFile" to "", "lastLatencyMs" to 0L))
             for (item in pending) {
                 coroutineContext.ensureActive()
                 if (isStopped || !BackgroundAiScheduler.isEnabled(context) ||
                     System.currentTimeMillis() - started > budgetMs) break
                 try {
+                    val startedItem = android.os.SystemClock.elapsedRealtime()
                     val indexed = manager.runAiAnalysisForItem(item)
                     // Persist each photo so a killed job does not lose its progress.
                     dao.updateMedia(indexed)
@@ -177,6 +182,14 @@ class IdleAiIndexWorker(context: Context, params: WorkerParameters) : CoroutineW
                         .putLong("last_indexed_ms", System.currentTimeMillis())
                         .putLong("processed_total", prefs.getLong("processed_total", 0L) + 1L)
                         .apply()
+                    completedThisPass++
+                    // WorkManager progress belongs to the actual worker and survives UI recreation.
+                    setProgress(workDataOf(
+                        "processedInPass" to completedThisPass,
+                        "batchSize" to pending.size,
+                        "currentFile" to item.fileName.take(96),
+                        "lastLatencyMs" to (android.os.SystemClock.elapsedRealtime() - startedItem)
+                    ))
                 } catch (cancel: kotlinx.coroutines.CancellationException) {
                     throw cancel
                 } catch (_: Exception) {
