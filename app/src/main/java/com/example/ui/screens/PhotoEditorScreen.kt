@@ -92,6 +92,7 @@ import com.example.core.media.PhotoProcessingEngine
 import com.example.core.media.StickerItemData
 import com.example.ui.TakzGalleryViewModel
 import java.util.Locale
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -473,7 +474,9 @@ fun PhotoEditorScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(
+                            displayBitmap,
                             activeTab,
+                            pipelineState,
                             aiToolMode,
                             brushIsRestore,
                             brushRadiusNorm,
@@ -483,8 +486,8 @@ fun PhotoEditorScreen(
                         ) {
                             if (activeTab == "BG_REMOVE" && aiToolMode == "CUTOUT") {
                                 detectTapGestures { pos ->
-                                    val nx = (pos.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                    val ny = (pos.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                    val (nx, ny) = mapPreviewTouch(pos, size.width, size.height, displayBitmap)
+                                        ?: return@detectTapGestures
                                     manualMaskStrokes.add(
                                         ImageSegmentationEngine.BrushStroke(
                                             normX = nx,
@@ -497,16 +500,18 @@ fun PhotoEditorScreen(
                                 }
                             } else if (activeTab == "BG_REMOVE" && aiToolMode == "SPOT_ERASER") {
                                 detectTapGestures { pos ->
-                                    val nx = (pos.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                    val ny = (pos.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
+                                    val (nx, ny) = mapPreviewTouch(pos, size.width, size.height, displayBitmap)
+                                        ?: return@detectTapGestures
                                     val updatedSpots = pipelineState.spotHealPoints + (nx to ny)
                                     updatePipeline(pipelineState.copy(spotHealPoints = updatedSpots))
                                 }
                             } else if (activeTab == "ANNOTATE") {
                                 detectTapGestures { pos ->
                                     if (pipelineState.placedStickers.isNotEmpty()) {
-                                        val nx = (pos.x / size.width.coerceAtLeast(1)).coerceIn(0.1f, 0.9f)
-                                        val ny = (pos.y / size.height.coerceAtLeast(1)).coerceIn(0.15f, 0.9f)
+                                        val (rawX, rawY) = mapPreviewTouch(pos, size.width, size.height, displayBitmap)
+                                            ?: return@detectTapGestures
+                                        val nx = rawX.coerceIn(0.1f, 0.9f)
+                                        val ny = rawY.coerceIn(0.15f, 0.9f)
                                         val list = pipelineState.placedStickers.toMutableList()
                                         val last = list.last()
                                         list[list.lastIndex] = last.copy(normX = nx, normY = ny)
@@ -515,20 +520,34 @@ fun PhotoEditorScreen(
                                 }
                             }
                         }
-                        .pointerInput(activeTab, activePenColorInt, activePenThickness) {
+                        .pointerInput(activeTab, displayBitmap, activePenColorInt, activePenThickness, pipelineState) {
                             if (activeTab == "ANNOTATE") {
-                                detectDragGestures { change, _ ->
-                                    val nx = (change.position.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                    val ny = (change.position.y / size.height.coerceAtLeast(1)).coerceIn(0f, 1f)
-                                    val currentPaths = pipelineState.drawingPaths.toMutableList()
-                                    val updatedStroke = DrawingPathData(
-                                        pointsNorm = listOf(nx to ny, (nx + 0.012f) to (ny + 0.012f)),
-                                        colorInt = activePenColorInt,
-                                        strokeWidthNorm = activePenThickness
-                                    )
-                                    currentPaths.add(updatedStroke)
-                                    pipelineState = pipelineState.copy(drawingPaths = currentPaths)
-                                }
+                                val strokePoints = mutableListOf<Pair<Float, Float>>()
+                                detectDragGestures(
+                                    onDragStart = { start ->
+                                        strokePoints.clear()
+                                        mapPreviewTouch(start, size.width, size.height, displayBitmap)
+                                            ?.let { strokePoints.add(it) }
+                                    },
+                                    onDragEnd = {
+                                        if (strokePoints.size >= 2) {
+                                            updatePipeline(pipelineState.copy(
+                                                drawingPaths = pipelineState.drawingPaths + DrawingPathData(
+                                                    pointsNorm = strokePoints.toList(),
+                                                    colorInt = activePenColorInt,
+                                                    strokeWidthNorm = activePenThickness
+                                                )
+                                            ))
+                                        }
+                                        strokePoints.clear()
+                                    },
+                                    onDragCancel = { strokePoints.clear() },
+                                    onDrag = { change, _ ->
+                                        change.consume()
+                                        mapPreviewTouch(change.position, size.width, size.height, displayBitmap)
+                                            ?.let { strokePoints.add(it) }
+                                    }
+                                )
                             }
                         }
                 )
@@ -1792,6 +1811,30 @@ private fun StickersPenAndTextControls(
 }
 
 @Composable
+
+// ContentScale.Fit letterboxes the image: map touches to actual displayed
+// pixels, not the full viewport. Ignore taps in the padding around the photo.
+private fun mapPreviewTouch(
+    point: Offset,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    bitmap: Bitmap
+): Pair<Float, Float>? {
+    if (viewportWidth <= 0 || viewportHeight <= 0 || bitmap.width <= 0 || bitmap.height <= 0) return null
+    val scale = min(
+        viewportWidth.toFloat() / bitmap.width,
+        viewportHeight.toFloat() / bitmap.height
+    )
+    val drawnWidth = bitmap.width * scale
+    val drawnHeight = bitmap.height * scale
+    val left = (viewportWidth - drawnWidth) / 2f
+    val top = (viewportHeight - drawnHeight) / 2f
+    val x = (point.x - left) / drawnWidth
+    val y = (point.y - top) / drawnHeight
+    if (x !in 0f..1f || y !in 0f..1f) return null
+    return x to y
+}
+
 private fun EditorSliderRow(
     label: String,
     value: Float,
