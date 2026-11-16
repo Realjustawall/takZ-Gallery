@@ -242,7 +242,7 @@ object PhotoProcessingEngine {
     /**
      * Applies the full non-destructive Samsung One UI Photo & Video EditPipelineState to a source Bitmap.
      */
-    fun renderPipeline(source: Bitmap, state: PhotoEditPipelineState): Bitmap {
+    fun renderPipeline(source: Bitmap, state: PhotoEditPipelineState, shouldCancel: () -> Boolean = { false }): Bitmap {
         // 1. Geometry transformations (Rotation, Straighten, Perspective, Flip, Aspect Crop, Resize)
         val working = applyGeometry(source, state)
         val w = working.width
@@ -302,6 +302,11 @@ object PhotoProcessingEngine {
         val rng = Random(42)
 
         for (y in 0 until h) {
+            // Slider gestures can supersede this frame. Abort obsolete per-pixel
+            // work every few rows instead of blocking newer previews.
+            if ((y and 7) == 0 && shouldCancel()) {
+                throw java.util.concurrent.CancellationException("Superseded photo preview")
+            }
             val ny = (y.toFloat() / h.toFloat()) - 0.5f
             for (x in 0 until w) {
                 val nx = (x.toFloat() / w.toFloat()) - 0.5f
