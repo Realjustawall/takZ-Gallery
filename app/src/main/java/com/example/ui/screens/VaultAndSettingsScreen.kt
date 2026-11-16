@@ -930,6 +930,7 @@ fun SettingsScreen(
             }
 
             if (selectedSection == "AI") {
+                item { AiIndexProgressPanel(viewModel, strings) }
                 item {
                     val enabled by viewModel.autoAiEnabled.collectAsStateWithLifecycle()
                     Card(
