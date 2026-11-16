@@ -318,6 +318,9 @@ fun SearchAndAiScreen(
             }
         }
 
+        // Counts come from Room and reflect the actual worker, including after process death.
+        AiIndexProgressPanel(viewModel, strings)
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
