@@ -1,0 +1,46 @@
+name: Publish Photo Editor and AI Progress Beta
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-editor-beta.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified signed optimized APKs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p apks
+          gh run download 43867735577 --repo "${{ github.repository }}" \
+            --name takz-optimized-signed-per-abi --dir apks
+          test "$(find apks -name '*.apk' -type f | wc -l)" -eq 4
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            apk="apks/app-${abi}-release.apk"
+            test -s "$apk"
+            bytes="$(stat -c%s "$apk")"
+            echo "$apk : $bytes bytes"
+            test "$bytes" -lt 50000000
+          done
+      - name: Create editor and AI progress beta Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create v0.4.0-beta apks/*.apk \
+            --repo "${{ github.repository }}" \
+            --target 12ccb26bb4014b600dcbc7891887bbbc29250eab \
+            --title "TakZ Gallery v0.4.0 Beta — Photo Editor & AI Progress" \
+            --prerelease \
+            --notes "Editor performance and indexing UI beta: progressive low-resolution / detailed previews, cancellable obsolete renders, grouped undo, real-time on-canvas pen strokes, fitted touch coordinates, labeled scrollable edit tools, and full-resolution cutout export using the chosen mask settings. AI indexing shows real database-backed indexed/total/remaining counts and WorkManager run status in Gallery, Search, and Settings. Automated tests, debug build, optimized builds, APK signatures and sub-50-MB per-architecture checks passed in GitHub Actions run 43867735577. This is a Samsung-inspired beta, not an exact proprietary Samsung editor. Actual responsiveness and feature accuracy are not yet measured on physical devices. APKs use an Android debug signing key (NOT production signing); updates from previous betas may require backup and reinstall. Choose arm64-v8a for most modern Android phones."
