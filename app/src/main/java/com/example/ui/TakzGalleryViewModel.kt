@@ -129,7 +129,7 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
         val lastLatencyMs: Long = 0L
     ) {
         val remaining: Int get() = (total - indexed).coerceAtLeast(0)
-        val percentage: Int get() = if (total == 0) 100 else
+        val percentage: Int get() = if (total == 0) 0 else
             (indexed.toLong() * 100L / total).toInt().coerceIn(0, 100)
     }
 
