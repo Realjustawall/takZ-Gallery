@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.WorkManager
+import androidx.work.WorkInfo
+import kotlinx.coroutines.flow.map
 import com.example.core.ai.ImageEmbeddingEngine
 import com.example.core.ai.ImageQualityEngine
 import com.example.core.ai.ImageSegmentationEngine
@@ -116,6 +119,39 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val indexingStatus = libraryManager.indexingStatus
+
+    data class AiIndexProgress(
+        val total: Int = 0,
+        val indexed: Int = 0,
+        val isRunning: Boolean = false,
+        val isWaitingForIdle: Boolean = false,
+        val currentFile: String = "",
+        val lastLatencyMs: Long = 0L
+    ) {
+        val remaining: Int get() = (total - indexed).coerceAtLeast(0)
+        val percentage: Int get() = if (total == 0) 100 else
+            (indexed.toLong() * 100L / total).toInt().coerceIn(0, 100)
+    }
+
+    private val backgroundAiWork = WorkManager.getInstance(context)
+        .getWorkInfosForUniqueWorkFlow(BackgroundAiScheduler.NAME)
+        .map { infos -> infos.firstOrNull { it.state == WorkInfo.State.RUNNING }
+            ?: infos.firstOrNull { it.state == WorkInfo.State.ENQUEUED } }
+
+    val aiIndexProgress: StateFlow<AiIndexProgress> =
+        combine(dao.observeAiEligibleImages(), dao.observeAiIndexedImages(), backgroundAiWork) {
+            total, indexed, worker ->
+            val active = worker?.state == WorkInfo.State.RUNNING
+            AiIndexProgress(
+                total = total,
+                indexed = indexed.coerceAtMost(total),
+                isRunning = active,
+                isWaitingForIdle = worker?.state == WorkInfo.State.ENQUEUED && indexed < total,
+                currentFile = if (active) worker.progress.getString("currentFile").orEmpty() else "",
+                lastLatencyMs = if (active) worker.progress.getLong("lastLatencyMs", 0L) else 0L
+            )
+        }.flowOn(Dispatchers.IO).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AiIndexProgress())
+
 
     private val _autoAiEnabled = MutableStateFlow(BackgroundAiScheduler.isEnabled(context))
     val autoAiEnabled: StateFlow<Boolean> = _autoAiEnabled.asStateFlow()
