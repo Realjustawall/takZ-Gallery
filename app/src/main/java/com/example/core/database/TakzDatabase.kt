@@ -19,6 +19,16 @@ interface TakzDao {
     @Query("SELECT * FROM media_items ORDER BY dateModifiedSec DESC")
     suspend fun getAllMediaOnce(): List<MediaItemEntity>
 
+    // Reactive counts are calculated in SQLite, not by parsing all images on the UI thread.
+    @Query("SELECT COUNT(*) FROM media_items WHERE isVideo = 0 AND isTrashed = 0")
+    fun observeAiEligibleImages(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM media_items WHERE isVideo = 0 AND isTrashed = 0 AND isIndexed = 1")
+    fun observeAiIndexedImages(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM media_items WHERE isVideo = 0 AND isTrashed = 0 AND isIndexed = 0")
+    suspend fun countPendingAiImages(): Int
+
     @Query("SELECT contentUri FROM media_items")
     suspend fun getAllMediaUrisOnce(): List<String>
 
