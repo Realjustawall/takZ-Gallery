@@ -164,6 +164,20 @@ fun PhotoEditorScreen(
     var brushRadiusNorm by remember { mutableFloatStateOf(0.06f) }
     var brushHardness by remember { mutableFloatStateOf(0.8f) }
     val manualMaskStrokes = remember { mutableStateListOf<ImageSegmentationEngine.BrushStroke>() }
+
+    fun saveCurrentCutout(overwrite: Boolean, format: String = "PNG") {
+        viewModel.saveAiCutout(
+            item = item,
+            pipelineState = pipelineState,
+            mode = bgMode,
+            solidColor = bgSolidColorInt,
+            featherRadius = featherRadius,
+            smoothingLevel = maskSmoothing,
+            strokes = manualMaskStrokes.toList(),
+            format = format,
+            overwrite = overwrite
+        )
+    }
     var segmentedPreviewBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     // Pen & Sticker state
@@ -229,6 +243,7 @@ fun PhotoEditorScreen(
     // Recompute AI Background Removal preview when parameters or strokes change
     LaunchedEffect(
         sourceBitmap,
+        renderedBitmap,
         activeTab,
         aiToolMode,
         bgMode,
@@ -237,7 +252,11 @@ fun PhotoEditorScreen(
         maskSmoothing,
         manualMaskStrokes.size
     ) {
-        if (activeTab != "BG_REMOVE" || aiToolMode != "CUTOUT") return@LaunchedEffect
+        if (activeTab != "BG_REMOVE" || aiToolMode != "CUTOUT") {
+            segmentedPreviewBitmap = null
+            return@LaunchedEffect
+        }
+        delay(100L)
         val src = renderedBitmap ?: sourceBitmap ?: return@LaunchedEffect
         val strokesSnapshot = manualMaskStrokes.toList()
         withContext(Dispatchers.Default) {
@@ -369,7 +388,9 @@ fun PhotoEditorScreen(
                             } else {
                                 renderedBitmap ?: sourceBitmap
                             }
-                            if (bmp != null) {
+                            if (!item.isVideo && activeTab == "BG_REMOVE" && aiToolMode == "CUTOUT") {
+                                saveCurrentCutout(overwrite = false)
+                            } else if (bmp != null) {
                                 if (item.isVideo || activeTab == "VIDEO") {
                                     viewModel.saveEditedVideoAndExport(
                                         item = item,
@@ -401,7 +422,9 @@ fun PhotoEditorScreen(
                             } else {
                                 renderedBitmap ?: sourceBitmap
                             }
-                            if (bmp != null) {
+                            if (!item.isVideo && activeTab == "BG_REMOVE" && aiToolMode == "CUTOUT") {
+                                saveCurrentCutout(overwrite = true)
+                            } else if (bmp != null) {
                                 if (item.isVideo || activeTab == "VIDEO") {
                                     viewModel.saveOverwriteOriginalVideo(
                                         item = item,
@@ -724,33 +747,23 @@ fun PhotoEditorScreen(
                     onBrushRadiusChange = { brushRadiusNorm = it },
                     strings = strings,
                     onOverwriteOriginal = {
-                        val bmp = if (aiToolMode == "CUTOUT") {
-                            segmentedPreviewBitmap ?: renderedBitmap ?: sourceBitmap
+                        if (aiToolMode == "CUTOUT") {
+                            saveCurrentCutout(overwrite = true)
                         } else {
-                            renderedBitmap ?: sourceBitmap
-                        }
-                        if (bmp != null) {
-                            viewModel.saveOverwriteOriginalPhoto(item, pipelineState, bmp, "PNG")
+                            val bmp = renderedBitmap ?: sourceBitmap
+                            if (bmp != null) viewModel.saveOverwriteOriginalPhoto(item, pipelineState, bmp, "PNG")
                         }
                     },
                     onExportPng = {
-                        val bmp = if (aiToolMode == "CUTOUT") {
-                            segmentedPreviewBitmap ?: renderedBitmap ?: sourceBitmap
-                        } else {
-                            renderedBitmap ?: sourceBitmap
-                        }
-                        if (bmp != null) {
-                            viewModel.saveBackgroundRemovedExport(item, bmp, "PNG")
+                        if (aiToolMode == "CUTOUT") saveCurrentCutout(overwrite = false, format = "PNG")
+                        else (renderedBitmap ?: sourceBitmap)?.let {
+                            viewModel.saveNonDestructiveEditAndExport(item, pipelineState, it, "PNG")
                         }
                     },
                     onExportWebp = {
-                        val bmp = if (aiToolMode == "CUTOUT") {
-                            segmentedPreviewBitmap ?: renderedBitmap ?: sourceBitmap
-                        } else {
-                            renderedBitmap ?: sourceBitmap
-                        }
-                        if (bmp != null) {
-                            viewModel.saveBackgroundRemovedExport(item, bmp, "WEBP")
+                        if (aiToolMode == "CUTOUT") saveCurrentCutout(overwrite = false, format = "WEBP")
+                        else (renderedBitmap ?: sourceBitmap)?.let {
+                            viewModel.saveNonDestructiveEditAndExport(item, pipelineState, it, "WEBP")
                         }
                     }
                 )
