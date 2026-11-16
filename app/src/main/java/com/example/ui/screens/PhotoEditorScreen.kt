@@ -291,14 +291,16 @@ fun PhotoEditorScreen(
             color = Color(0xFF141417),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     IconButton(
                         onClick = { viewModel.closePhotoEditor() },
                         modifier = Modifier.testTag("editor_close_button")
@@ -327,7 +329,11 @@ fun PhotoEditorScreen(
                     }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     // Undo
                     IconButton(
                         onClick = {
@@ -718,7 +724,7 @@ fun PhotoEditorScreen(
             color = Color(0xFF121215),
             modifier = Modifier
                 .fillMaxWidth()
-                .height(295.dp)
+                .height(if (activeTab == "ADJUST" || activeTab == "FILTERS") 208.dp else 248.dp)
         ) {
             when (activeTab) {
                 "VIDEO" -> OneUiVideoStudioControls(
