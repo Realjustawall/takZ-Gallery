@@ -76,6 +76,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -183,6 +185,9 @@ fun PhotoEditorScreen(
     // Pen & Sticker state
     var activePenColorInt by remember { mutableIntStateOf(android.graphics.Color.parseColor("#3E82F7")) }
     var activePenThickness by remember { mutableFloatStateOf(0.012f) }
+    // Overlay stroke points are drawn directly by Compose; image pixels render
+    // only once after the gesture finishes, avoiding costly work on drag frames.
+    val livePenStroke = remember(item.id) { mutableStateListOf<Pair<Float, Float>>() }
 
     // Decode off the UI thread. A cached 420px working copy provides immediate
     // low-cost previews while the 960px source gives a detailed settled preview.
@@ -549,8 +554,12 @@ fun PhotoEditorScreen(
                                 detectDragGestures(
                                     onDragStart = { start ->
                                         strokePoints.clear()
+                                        livePenStroke.clear()
                                         mapPreviewTouch(start, size.width, size.height, displayBitmap)
-                                            ?.let { strokePoints.add(it) }
+                                            ?.let {
+                                                strokePoints.add(it)
+                                                livePenStroke.add(it)
+                                            }
                                     },
                                     onDragEnd = {
                                         if (strokePoints.size >= 2) {
@@ -563,17 +572,52 @@ fun PhotoEditorScreen(
                                             ))
                                         }
                                         strokePoints.clear()
+                                        livePenStroke.clear()
                                     },
-                                    onDragCancel = { strokePoints.clear() },
+                                    onDragCancel = {
+                                        strokePoints.clear()
+                                        livePenStroke.clear()
+                                    },
                                     onDrag = { change, _ ->
                                         change.consume()
                                         mapPreviewTouch(change.position, size.width, size.height, displayBitmap)
-                                            ?.let { strokePoints.add(it) }
+                                            ?.let {
+                                                strokePoints.add(it)
+                                                livePenStroke.add(it)
+                                            }
                                     }
                                 )
                             }
                         }
                 )
+            }
+
+            if (activeTab == "ANNOTATE" && livePenStroke.size > 1 && displayBitmap != null) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val scale = min(
+                        size.width / displayBitmap.width,
+                        size.height / displayBitmap.height
+                    )
+                    val dw = displayBitmap.width * scale
+                    val dh = displayBitmap.height * scale
+                    val ox = (size.width - dw) / 2f
+                    val oy = (size.height - dh) / 2f
+                    val path = Path()
+                    val first = livePenStroke.first()
+                    path.moveTo(ox + first.first * dw, oy + first.second * dh)
+                    for (pt in livePenStroke.drop(1)) {
+                        path.lineTo(ox + pt.first * dw, oy + pt.second * dh)
+                    }
+                    drawPath(
+                        path = path,
+                        color = Color(activePenColorInt),
+                        style = Stroke(
+                            width = (activePenThickness * min(dw, dh)).coerceAtLeast(1f),
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        )
+                    )
+                }
             }
 
             if (isPreviewRendering && !showOriginalBefore) {
