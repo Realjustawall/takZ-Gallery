@@ -1278,100 +1278,126 @@ private fun BasicAdjustmentsControls(
     onOverwrite: () -> Unit,
     onExport: () -> Unit
 ) {
+    // One active adjustment at a time keeps the photo large and all controls reachable.
+    val toolNames = listOf(
+        "EXPOSURE" to strings.tr("Exposure", "نوردهی"),
+        "BRIGHTNESS" to strings.tr("Brightness", "روشنایی"),
+        "CONTRAST" to strings.tr("Contrast", "کنتراست"),
+        "HIGHLIGHTS" to strings.tr("Highlights", "نقاط روشن"),
+        "SHADOWS" to strings.tr("Shadows", "سایه‌ها"),
+        "SATURATION" to strings.tr("Saturation", "اشباع"),
+        "VIBRANCE" to strings.tr("Vibrance", "شادابی"),
+        "WARMTH" to strings.tr("Temperature", "گرمی"),
+        "TINT" to strings.tr("Tint", "ته‌رنگ"),
+        "SHARPNESS" to strings.tr("Sharpness", "وضوح"),
+        "CLARITY" to strings.tr("Clarity", "شفافیت"),
+        "DEHAZE" to strings.tr("Dehaze", "مه‌زدایی"),
+        "VIGNETTE" to strings.tr("Vignette", "تیرگی گوشه"),
+        "GRAIN" to strings.tr("Grain", "دانه فیلم"),
+        "FADE" to strings.tr("Fade", "مات")
+    )
+    var selectedTool by remember { mutableStateOf("BRIGHTNESS") }
+    val current = when (selectedTool) {
+        "EXPOSURE" -> state.exposure
+        "CONTRAST" -> state.contrast
+        "HIGHLIGHTS" -> state.highlights
+        "SHADOWS" -> state.shadows
+        "SATURATION" -> state.saturation
+        "VIBRANCE" -> state.vibrance
+        "WARMTH" -> state.warmthTemp
+        "TINT" -> state.tint
+        "SHARPNESS" -> state.sharpness
+        "CLARITY" -> state.clarity
+        "DEHAZE" -> state.dehaze
+        "VIGNETTE" -> state.vignette
+        "GRAIN" -> state.grain
+        "FADE" -> state.fade
+        else -> state.brightness
+    }
+    fun applyValue(value: Float) {
+        onUpdate(when (selectedTool) {
+            "EXPOSURE" -> state.copy(exposure = value)
+            "CONTRAST" -> state.copy(contrast = value)
+            "HIGHLIGHTS" -> state.copy(highlights = value)
+            "SHADOWS" -> state.copy(shadows = value)
+            "SATURATION" -> state.copy(saturation = value)
+            "VIBRANCE" -> state.copy(vibrance = value)
+            "WARMTH" -> state.copy(warmthTemp = value)
+            "TINT" -> state.copy(tint = value)
+            "SHARPNESS" -> state.copy(sharpness = value)
+            "CLARITY" -> state.copy(clarity = value)
+            "DEHAZE" -> state.copy(dehaze = value)
+            "VIGNETTE" -> state.copy(vignette = value)
+            "GRAIN" -> state.copy(grain = value)
+            "FADE" -> state.copy(fade = value)
+            else -> state.copy(brightness = value)
+        })
+    }
+    val range = if (selectedTool in setOf("VIGNETTE", "GRAIN", "FADE")) 0f..1f else -1f..1f
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(14.dp)
-            .verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            FilledTonalButton(
-                onClick = {
-                    onUpdate(
-                        state.copy(
-                            exposure = 0.12f,
-                            contrast = 0.18f,
-                            highlights = -0.14f,
-                            shadows = 0.22f,
-                            saturation = 0.14f,
-                            vibrance = 0.20f,
-                            clarity = 0.16f,
-                            sharpness = 0.18f
-                        )
-                    )
-                },
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("samsung_auto_enhance_button")
-            ) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(strings.tr("Auto Enhance", "بهبود خودکار"), maxLines = 1)
+            for ((key, name) in toolNames) {
+                FilterChip(
+                    selected = selectedTool == key,
+                    onClick = { selectedTool = key },
+                    label = { Text(name, maxLines = 1) },
+                    modifier = Modifier.testTag("adjust_${key.lowercase()}")
+                )
             }
-
-            Button(
-                onClick = onOverwrite,
-                shape = RoundedCornerShape(14.dp),
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                toolNames.first { it.first == selectedTool }.second,
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.White
+            )
+            Text(
+                "${(current * 100f).toInt()}",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color(0xFF72A9FF)
+            )
+        }
+        Slider(
+            value = current.coerceIn(range.start, range.endInclusive),
+            onValueChange = ::applyValue,
+            valueRange = range,
+            modifier = Modifier.fillMaxWidth().testTag("active_adjustment_slider")
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            FilledTonalButton(
+                onClick = { applyValue(0f) },
                 modifier = Modifier.weight(1f)
             ) {
-                Text(strings.tr("Save Original", "ذخیره روی اصلی"), maxLines = 1)
+                Text(strings.tr("Reset adjustment", "بازنشانی این ابزار"), maxLines = 1)
             }
-
             FilledTonalButton(
-                onClick = onExport,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .weight(1f)
-                    .testTag("save_edited_photo_button")
+                onClick = {
+                    onUpdate(state.copy(
+                        exposure = 0.12f, contrast = 0.18f,
+                        highlights = -0.14f, shadows = 0.22f,
+                        saturation = 0.14f, vibrance = 0.20f,
+                        clarity = 0.16f, sharpness = 0.18f
+                    ))
+                },
+                modifier = Modifier.weight(1f).testTag("samsung_auto_enhance_button")
             ) {
-                Text(strings.tr("Save Copy", "ذخیره کپی"), maxLines = 1)
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text(strings.tr("Auto", "خودکار"))
             }
-        }
-
-        EditorSliderRow(strings.tr("Exposure", "نوردهی (Exposure)"), state.exposure, -1f..1f) {
-            onUpdate(state.copy(exposure = it))
-        }
-        EditorSliderRow(strings.tr("Brightness", "روشنایی (Brightness)"), state.brightness, -1f..1f) {
-            onUpdate(state.copy(brightness = it))
-        }
-        EditorSliderRow(strings.tr("Contrast", "کنتراست (Contrast)"), state.contrast, -1f..1f) {
-            onUpdate(state.copy(contrast = it))
-        }
-        EditorSliderRow(strings.tr("Highlights", "نقاط روشن (Highlights)"), state.highlights, -1f..1f) {
-            onUpdate(state.copy(highlights = it))
-        }
-        EditorSliderRow(strings.tr("Shadows", "سایه‌ها (Shadows)"), state.shadows, -1f..1f) {
-            onUpdate(state.copy(shadows = it))
-        }
-        EditorSliderRow(strings.tr("Saturation", "اشباع رنگ (Saturation)"), state.saturation, -1f..1f) {
-            onUpdate(state.copy(saturation = it))
-        }
-        EditorSliderRow(strings.tr("Warmth / Temp", "دمای رنگ (گرمی / سردی)"), state.warmthTemp, -1f..1f) {
-            onUpdate(state.copy(warmthTemp = it))
-        }
-        EditorSliderRow(strings.tr("Sharpness", "تیزی و وضوح لبه‌ها (Sharpness)"), state.sharpness, -1f..1f) {
-            onUpdate(state.copy(sharpness = it))
-        }
-        EditorSliderRow(strings.tr("Clarity & Definition", "شفافیت و جزئیات (Clarity)"), state.clarity, -1f..1f) {
-            onUpdate(state.copy(clarity = it))
-        }
-        EditorSliderRow(strings.tr("Dehaze", "مه‌زدایی (Dehaze)"), state.dehaze, -1f..1f) {
-            onUpdate(state.copy(dehaze = it))
-        }
-        EditorSliderRow(strings.tr("Vignette", "تیرگی گوشه‌ها (Vignette)"), state.vignette, 0f..1f) {
-            onUpdate(state.copy(vignette = it))
-        }
-        EditorSliderRow(strings.tr("Film Grain", "دانه فیلم (Grain)"), state.grain, 0f..1f) {
-            onUpdate(state.copy(grain = it))
-        }
-        EditorSliderRow(strings.tr("Matte Fade", "مات‌سازی سیاهی (Fade)"), state.fade, 0f..1f) {
-            onUpdate(state.copy(fade = it))
         }
     }
 }
