@@ -596,6 +596,67 @@ class TakzGalleryViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    /**
+     * Render the actual AI cutout at export resolution, not the reduced 420/960px
+     * editor preview. Reuses identical mask parameters for WYSIWYG output.
+     */
+    fun saveAiCutout(
+        item: MediaItemEntity,
+        pipelineState: PhotoEditPipelineState,
+        mode: String,
+        solidColor: Int,
+        featherRadius: Int,
+        smoothingLevel: Int,
+        strokes: List<ImageSegmentationEngine.BrushStroke>,
+        format: String = "PNG",
+        overwrite: Boolean = false
+    ) {
+        viewModelScope.launch {
+            try {
+                val exportedBitmap = withContext(Dispatchers.Default) {
+                    val original = libraryManager.loadSampledBitmap(item.contentUri, 4096)
+                        ?: throw IllegalStateException("Cannot open original image for export")
+                    val processed = PhotoProcessingEngine.renderPipeline(original, pipelineState)
+                    val mask = segmentationEngine.generateAlphaMask(
+                        source = processed,
+                        featherRadiusPx = featherRadius,
+                        smoothingLevel = smoothingLevel,
+                        manualStrokes = strokes
+                    )
+                    segmentationEngine.compositeBackground(
+                        source = processed, alphaMask = mask, mode = mode,
+                        solidColor = solidColor
+                    )
+                }
+                // Transparent pixels must never be silently discarded by JPEG overwrite.
+                val safeOverwrite = overwrite && mode != "TRANSPARENT"
+                val outputFormat = if (mode == "TRANSPARENT") "PNG" else format
+                if (safeOverwrite) {
+                    val updated = libraryManager.overwriteExistingBitmap(
+                        originalItem = item, bitmap = exportedBitmap,
+                        format = outputFormat, pipelineSerialized = pipelineState.serialize()
+                    )
+                    closePhotoEditor()
+                    openMediaViewer(updated.id)
+                    showStatusMessage("Full-resolution AI edit saved")
+                } else {
+                    val copy = libraryManager.saveExportedBitmap(
+                        bitmap = exportedBitmap,
+                        prefix = "Cutout_${item.fileName.substringBeforeLast('.')}",
+                        format = outputFormat,
+                        folderName = "AI Cutouts"
+                    )
+                    closePhotoEditor()
+                    openMediaViewer(copy.id)
+                    showStatusMessage(if (overwrite) "Saved a PNG copy to preserve transparency"
+                        else "Saved full-resolution AI cutout")
+                }
+            } catch (e: Exception) {
+                showStatusMessage("AI export failed: ${e.message}")
+            }
+        }
+    }
+
     fun saveBackgroundRemovedExport(
         originalItem: MediaItemEntity,
         compositedBitmap: Bitmap,
