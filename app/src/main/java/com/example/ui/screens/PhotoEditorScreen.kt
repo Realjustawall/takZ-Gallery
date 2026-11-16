@@ -532,6 +532,21 @@ fun PhotoEditorScreen(
                 )
             }
 
+            if (isPreviewRendering && !showOriginalBefore) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.68f),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
+                ) {
+                    Text(
+                        strings.tr("Updating preview…", "در حال به‌روزرسانی پیش‌نمایش…"),
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                }
+            }
+
             if (showOriginalBefore) {
                 Surface(
                     color = Color.Black.copy(alpha = 0.78f),
@@ -565,30 +580,45 @@ fun PhotoEditorScreen(
                 Triple("CURVES", strings.tr("Curves & Resize", "منحنی و اندازه"), Icons.AutoMirrored.Filled.ShowChart),
                 Triple("HSL", strings.tr("HSL", "رنگ HSL"), Icons.Default.Palette)
             )
+            // Scrollable Samsung-style labeled bottom dock. Every tool remains
+            // reachable on narrow displays and labels are visible (not icon-only).
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 for ((tabKey, tabDesc, tabIcon) in editorTabs) {
-                    val selected = activeTab == tabKey
-                    Surface(
-                        onClick = { activeTab = tabKey },
-                        shape = CircleShape,
-                        color = if (selected) Color(0xFF3E82F7) else Color(0xFF23252C),
-                        modifier = Modifier
-                            .size(40.dp)
-                            .testTag("editor_tab_${tabKey.lowercase()}")
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = tabIcon,
-                                contentDescription = tabDesc,
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
+                    if (item.isVideo || tabKey != "VIDEO") {
+                        val selected = activeTab == tabKey
+                        Surface(
+                            onClick = { activeTab = tabKey },
+                            shape = RoundedCornerShape(20.dp),
+                            color = if (selected) Color(0xFF3578E5) else Color(0xFF23252C),
+                            modifier = Modifier
+                                .width(76.dp)
+                                .testTag("editor_tab_${tabKey.lowercase()}")
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 8.dp, horizontal = 3.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = tabIcon,
+                                    contentDescription = tabDesc,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Text(
+                                    tabDesc,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White,
+                                    maxLines = 1
+                                )
+                            }
                         }
                     }
                 }
