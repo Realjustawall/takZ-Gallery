@@ -454,6 +454,9 @@ fun GalleryHomeScreen(
             }
         }
 
+        // Small genuine AI progress banner above the gallery, updated by Room.
+        AiIndexProgressPanel(viewModel, strings, compact = true)
+
         // Main Samsung Gallery Timeline & Smart Grouping Content
         LazyColumn(
             modifier = Modifier
